@@ -1,0 +1,34 @@
+From 0eae7db9e06645ef88d0cf15672770776293edb5 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pavel=20B=C5=99ezina?= <pbrezina@redhat.com>
+Date: Mon, 23 May 2022 11:05:01 +0200
+Subject: [PATCH] pam_sss_gss: KRB5CCNAME may be NULL
+
+Resolves: https://github.com/SSSD/sssd/issues/6180
+
+:fixes: A regression in pam_sss_gss module causing a failure if
+  KRB5CCNAME environment variable was not set was fixed.
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+(cherry picked from commit 9aad30711a5928f0e8a3627305b6449291de507f)
+---
+ src/sss_client/pam_sss_gss.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/sss_client/pam_sss_gss.c b/src/sss_client/pam_sss_gss.c
+index 51047efc3..77a58e4cf 100644
+--- a/src/sss_client/pam_sss_gss.c
++++ b/src/sss_client/pam_sss_gss.c
+@@ -492,7 +492,8 @@ static errno_t sss_cli_getenv(const char *variable_name, char **_value)
+ {
+     char *value = getenv(variable_name);
+     if (value == NULL) {
+-        return ENOENT;
++        *_value = NULL;
++        return EOK;
+     }
+ 
+     *_value = strdup(value);
+-- 
+2.34.3
+

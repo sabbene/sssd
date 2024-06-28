@@ -1,0 +1,46 @@
+From e865b008aa8947efca0116deb95e29cc2309256f Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Tue, 30 Mar 2021 15:31:17 +0200
+Subject: [PATCH] AD GPO: respect ad_gpo_implicit_deny if no GPO is present
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Currently ad_gpo_implicit_deny=True is not applied if there is no GPO at
+all for the given client. With this patch this case is handled as
+expected as well.
+
+Resolves: https://github.com/SSSD/sssd/issues/5561
+
+:fixes: `ad_gpo_implicit_deny` is now respected even if there are no
+        applicable GPOs present
+
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+---
+ src/providers/ad/ad_gpo.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/src/providers/ad/ad_gpo.c b/src/providers/ad/ad_gpo.c
+index b15e0f345..4ef6a7219 100644
+--- a/src/providers/ad/ad_gpo.c
++++ b/src/providers/ad/ad_gpo.c
+@@ -2472,7 +2472,15 @@ ad_gpo_process_gpo_done(struct tevent_req *subreq)
+             }
+         }
+ 
+-        ret = EOK;
++        if (state->gpo_implicit_deny == true) {
++            DEBUG(SSSDBG_TRACE_FUNC,
++                  "No applicable GPOs have been found and ad_gpo_implicit_deny"
++                  " is set to 'true'. The user will be denied access.\n");
++            ret = ERR_ACCESS_DENIED;
++        } else {
++            ret = EOK;
++        }
++
+         goto done;
+     }
+ 
+-- 
+2.26.3
+

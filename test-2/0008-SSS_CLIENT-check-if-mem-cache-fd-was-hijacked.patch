@@ -1,0 +1,86 @@
+From a186224d6e1ce0c91507df58fec424209a307fe3 Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Fri, 15 Dec 2023 14:52:51 +0100
+Subject: [PATCH 8/9] SSS_CLIENT: check if mem-cache fd was hijacked
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Real life example would be:
+https://github.com/TigerVNC/tigervnc/blob/effd854bfd19654fa67ff3d39514a91a246b8ae6/unix/xserver/hw/vnc/xvnc.c#L369
+ - TigerVNC unconditionally overwrites fd=3
+
+Resolves: https://github.com/SSSD/sssd/issues/6986
+
+Reviewed-by: Alejandro López <allopez@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+Reviewed-by: Tomáš Halman <thalman@redhat.com>
+(cherry picked from commit 0344c41aca0d6fcaa33e081ed77297607e48ced4)
+---
+ src/sss_client/nss_mc.h        |  6 ++++--
+ src/sss_client/nss_mc_common.c | 10 ++++++++++
+ 2 files changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/src/sss_client/nss_mc.h b/src/sss_client/nss_mc.h
+index 9ab2736fa..646861ba5 100644
+--- a/src/sss_client/nss_mc.h
++++ b/src/sss_client/nss_mc.h
+@@ -53,6 +53,8 @@ struct sss_cli_mc_ctx {
+     pthread_mutex_t *mutex;
+ #endif
+     int fd;
++    ino_t fd_inode;
++    dev_t fd_device;
+ 
+     uint32_t seed;          /* seed from the tables header */
+ 
+@@ -69,9 +71,9 @@ struct sss_cli_mc_ctx {
+ };
+ 
+ #if HAVE_PTHREAD
+-#define SSS_CLI_MC_CTX_INITIALIZER(mtx) {UNINITIALIZED, (mtx), -1, 0, NULL, 0, NULL, 0, NULL, 0, 0}
++#define SSS_CLI_MC_CTX_INITIALIZER(mtx) {UNINITIALIZED, (mtx), -1, 0, 0, 0, NULL, 0, NULL, 0, NULL, 0, 0}
+ #else
+-#define SSS_CLI_MC_CTX_INITIALIZER {UNINITIALIZED, -1, 0, NULL, 0, NULL, 0, NULL, 0, 0}
++#define SSS_CLI_MC_CTX_INITIALIZER {UNINITIALIZED, -1, 0, 0, 0, NULL, 0, NULL, 0, NULL, 0, 0}
+ #endif
+ 
+ errno_t sss_nss_mc_get_ctx(const char *name, struct sss_cli_mc_ctx *ctx);
+diff --git a/src/sss_client/nss_mc_common.c b/src/sss_client/nss_mc_common.c
+index 37119fa8d..17683ac0e 100644
+--- a/src/sss_client/nss_mc_common.c
++++ b/src/sss_client/nss_mc_common.c
+@@ -87,6 +87,12 @@ static errno_t sss_nss_mc_validate(struct sss_cli_mc_ctx *ctx)
+         return EINVAL;
+     }
+ 
++    /* FD was hijacked */
++    if ((fdstat.st_dev != ctx->fd_device) || (fdstat.st_ino != ctx->fd_inode)) {
++        ctx->fd = -1; /* don't ruin app even if it's misbehaving */
++        return EINVAL;
++    }
++
+     /* Invalid size. */
+     if (fdstat.st_size != ctx->mmap_size) {
+         return EINVAL;
+@@ -161,6 +167,8 @@ static void sss_nss_mc_destroy_ctx(struct sss_cli_mc_ctx *ctx)
+         close(ctx->fd);
+     }
+     ctx->fd = -1;
++    ctx->fd_inode = 0;
++    ctx->fd_device = 0;
+ 
+     ctx->seed = 0;
+     ctx->data_table = NULL;
+@@ -202,6 +210,8 @@ static errno_t sss_nss_mc_init_ctx(const char *name,
+         ret = EIO;
+         goto done;
+     }
++    ctx->fd_inode = fdstat.st_ino;
++    ctx->fd_device = fdstat.st_dev;
+ 
+     if (fdstat.st_size < MC_HEADER_SIZE) {
+         ret = ENOMEM;
+-- 
+2.41.0
+

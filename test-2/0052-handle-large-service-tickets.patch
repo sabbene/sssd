@@ -1,0 +1,233 @@
+From b6efe6b119b0c11314a324e8a2cf96fb74a9c983 Mon Sep 17 00:00:00 2001
+From: Sam Morris <sam@robots.org.uk>
+Date: Tue, 6 Apr 2021 18:42:19 +0100
+Subject: [PATCH 1/6] responder/common/responder_packet: handle large service
+ tickets
+
+Resolves: https://github.com/SSSD/sssd/issues/5568
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ src/responder/common/responder_packet.c | 11 +++++++++++
+ src/responder/common/responder_packet.h |  1 +
+ 2 files changed, 12 insertions(+)
+
+diff --git a/src/responder/common/responder_packet.c b/src/responder/common/responder_packet.c
+index f56d92276..d091332b0 100644
+--- a/src/responder/common/responder_packet.c
++++ b/src/responder/common/responder_packet.c
+@@ -229,6 +229,17 @@ int sss_packet_recv(struct sss_packet *packet, int fd)
+             if (ret != EOK) {
+                 return ret;
+             }
++	/* Kerberos tickets can get pretty big; since Windows Server 2012, the
++	 * limit is 48 KiB!
++	 */
++	} else if ((sss_packet_get_cmd(packet) == SSS_GSSAPI_SEC_CTX)
++                && packet->memsize < SSS_GSSAPI_PACKET_MAX_RECV_SIZE
++                && new_len < SSS_GSSAPI_PACKET_MAX_RECV_SIZE) {
++            sss_packet_set_len(packet, 0);
++            ret = sss_packet_grow(packet, new_len);
++            if (ret != EOK) {
++                return ret;
++            }
+         } else {
+             return EINVAL;
+         }
+diff --git a/src/responder/common/responder_packet.h b/src/responder/common/responder_packet.h
+index 509a22a9a..70bf1e8d3 100644
+--- a/src/responder/common/responder_packet.h
++++ b/src/responder/common/responder_packet.h
+@@ -26,6 +26,7 @@
+ 
+ #define SSS_PACKET_MAX_RECV_SIZE 1024
+ #define SSS_CERT_PACKET_MAX_RECV_SIZE ( 10 * SSS_PACKET_MAX_RECV_SIZE )
++#define SSS_GSSAPI_PACKET_MAX_RECV_SIZE ( SSS_PACKET_MAX_RECV_SIZE + 48 * 1024 )
+ 
+ struct sss_packet;
+ 
+-- 
+2.26.3
+
+
+From c6a76283580c25ff78b36b8b23efdabbdb3a2cc1 Mon Sep 17 00:00:00 2001
+From: Sam Morris <sam@robots.org.uk>
+Date: Wed, 7 Apr 2021 14:21:34 +0100
+Subject: [PATCH 2/6] responder/common/responder_packet: reduce duplication of
+ code that handles larger-than-normal packets
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ src/responder/common/responder_packet.c | 40 +++++++++++++------------
+ 1 file changed, 21 insertions(+), 19 deletions(-)
+
+diff --git a/src/responder/common/responder_packet.c b/src/responder/common/responder_packet.c
+index d091332b0..523c9ddd4 100644
+--- a/src/responder/common/responder_packet.c
++++ b/src/responder/common/responder_packet.c
+@@ -216,25 +216,27 @@ int sss_packet_recv(struct sss_packet *packet, int fd)
+ 
+     new_len = sss_packet_get_len(packet);
+     if (new_len > packet->memsize) {
+-        /* Allow certificate based requests to use larger buffer but not
+-         * larger than SSS_CERT_PACKET_MAX_RECV_SIZE. Due to the way
+-         * sss_packet_grow() works the packet len must be set to '0' first and
+-         * then grow to the expected size. */
+-        if ((sss_packet_get_cmd(packet) == SSS_NSS_GETNAMEBYCERT
+-                    || sss_packet_get_cmd(packet) == SSS_NSS_GETLISTBYCERT)
+-                && packet->memsize < SSS_CERT_PACKET_MAX_RECV_SIZE
+-                && new_len < SSS_CERT_PACKET_MAX_RECV_SIZE) {
+-            sss_packet_set_len(packet, 0);
+-            ret = sss_packet_grow(packet, new_len);
+-            if (ret != EOK) {
+-                return ret;
+-            }
+-	/* Kerberos tickets can get pretty big; since Windows Server 2012, the
+-	 * limit is 48 KiB!
+-	 */
+-	} else if ((sss_packet_get_cmd(packet) == SSS_GSSAPI_SEC_CTX)
+-                && packet->memsize < SSS_GSSAPI_PACKET_MAX_RECV_SIZE
+-                && new_len < SSS_GSSAPI_PACKET_MAX_RECV_SIZE) {
++        enum sss_cli_command cmd = sss_packet_get_cmd(packet);
++        size_t max_recv_size;
++
++        /* Allow certain packet types to use a larger buffer. */
++        switch (cmd) {
++        case SSS_NSS_GETNAMEBYCERT:
++        case SSS_NSS_GETLISTBYCERT:
++            max_recv_size = SSS_CERT_PACKET_MAX_RECV_SIZE;
++            break;
++
++        case SSS_GSSAPI_SEC_CTX:
++            max_recv_size = SSS_GSSAPI_PACKET_MAX_RECV_SIZE;
++            break;
++
++        default:
++            max_recv_size = 0;
++        }
++
++        /* Due to the way sss_packet_grow() works, the packet len must be set
++         * to 0 first, and then grown to the expected size. */
++        if (max_recv_size && packet->memsize < max_recv_size && new_len < max_recv_size) {
+             sss_packet_set_len(packet, 0);
+             ret = sss_packet_grow(packet, new_len);
+             if (ret != EOK) {
+-- 
+2.26.3
+
+
+From 63f318f73c933dc2cb08cad2f911a52d2281c45b Mon Sep 17 00:00:00 2001
+From: Sam Morris <sam@robots.org.uk>
+Date: Wed, 7 Apr 2021 14:22:25 +0100
+Subject: [PATCH 3/6] responder/common/responder_packet: add debug logging to
+ assist with errors caused by overlarge packets
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ src/responder/common/responder_packet.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/responder/common/responder_packet.c b/src/responder/common/responder_packet.c
+index 523c9ddd4..01a4e640e 100644
+--- a/src/responder/common/responder_packet.c
++++ b/src/responder/common/responder_packet.c
+@@ -243,6 +243,9 @@ int sss_packet_recv(struct sss_packet *packet, int fd)
+                 return ret;
+             }
+         } else {
++            DEBUG(SSSDBG_OP_FAILURE,
++                "Refusing to read overlarge packet from fd %d (length %zu bytes, cmd %#04x)",
++                    fd, new_len, cmd);
+             return EINVAL;
+         }
+     }
+-- 
+2.26.3
+
+
+From 37d331774385b2b871ba76fcdef6ceafd776efce Mon Sep 17 00:00:00 2001
+From: Sam Morris <sam@robots.org.uk>
+Date: Wed, 7 Apr 2021 14:23:03 +0100
+Subject: [PATCH 4/6] responder/common/responder_packet: further increase
+ packet size for SSS_GSSAPI_SEC_CTX
+
+Tokens can be 48 KiB in Windows Server 2012. Limiting to 128 KiB
+provides extra overhead should that increase in the future.
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ src/responder/common/responder_packet.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/responder/common/responder_packet.h b/src/responder/common/responder_packet.h
+index 70bf1e8d3..fd991969b 100644
+--- a/src/responder/common/responder_packet.h
++++ b/src/responder/common/responder_packet.h
+@@ -26,7 +26,7 @@
+ 
+ #define SSS_PACKET_MAX_RECV_SIZE 1024
+ #define SSS_CERT_PACKET_MAX_RECV_SIZE ( 10 * SSS_PACKET_MAX_RECV_SIZE )
+-#define SSS_GSSAPI_PACKET_MAX_RECV_SIZE ( SSS_PACKET_MAX_RECV_SIZE + 48 * 1024 )
++#define SSS_GSSAPI_PACKET_MAX_RECV_SIZE ( 128 * 1024 )
+ 
+ struct sss_packet;
+ 
+-- 
+2.26.3
+
+
+From 5c9fa75bd0ffa02e31cbbf19ee68134ed384229a Mon Sep 17 00:00:00 2001
+From: Sam Morris <sam@robots.org.uk>
+Date: Wed, 7 Apr 2021 19:59:45 +0100
+Subject: [PATCH 5/6] responder/common/responder_packet: remove some
+ unnecessary checks before growing packet
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ src/responder/common/responder_packet.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/responder/common/responder_packet.c b/src/responder/common/responder_packet.c
+index 01a4e640e..c4b38f71b 100644
+--- a/src/responder/common/responder_packet.c
++++ b/src/responder/common/responder_packet.c
+@@ -236,7 +236,7 @@ int sss_packet_recv(struct sss_packet *packet, int fd)
+ 
+         /* Due to the way sss_packet_grow() works, the packet len must be set
+          * to 0 first, and then grown to the expected size. */
+-        if (max_recv_size && packet->memsize < max_recv_size && new_len < max_recv_size) {
++        if (new_len < max_recv_size) {
+             sss_packet_set_len(packet, 0);
+             ret = sss_packet_grow(packet, new_len);
+             if (ret != EOK) {
+-- 
+2.26.3
+
+
+From b87619f9a917d6ed9ecdb5360c4bf242dce8e372 Mon Sep 17 00:00:00 2001
+From: Sam Morris <sam@robots.org.uk>
+Date: Thu, 8 Apr 2021 19:09:33 +0100
+Subject: [PATCH 6/6] responder/common/responder_packet: allow packets of max
+ size
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ src/responder/common/responder_packet.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/responder/common/responder_packet.c b/src/responder/common/responder_packet.c
+index c4b38f71b..f2223c665 100644
+--- a/src/responder/common/responder_packet.c
++++ b/src/responder/common/responder_packet.c
+@@ -236,7 +236,7 @@ int sss_packet_recv(struct sss_packet *packet, int fd)
+ 
+         /* Due to the way sss_packet_grow() works, the packet len must be set
+          * to 0 first, and then grown to the expected size. */
+-        if (new_len < max_recv_size) {
++        if (new_len <= max_recv_size) {
+             sss_packet_set_len(packet, 0);
+             ret = sss_packet_grow(packet, new_len);
+             if (ret != EOK) {
+-- 
+2.26.3
+

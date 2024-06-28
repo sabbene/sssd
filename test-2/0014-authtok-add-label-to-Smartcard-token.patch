@@ -1,0 +1,1072 @@
+From 8b6be52e95e953ae0431676de0b8c8be7a3262bc Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Fri, 13 Nov 2020 18:05:14 +0100
+Subject: [PATCH 14/16] authtok: add label to Smartcard token
+
+The key-id might not be sufficient to identify a certificate on a
+Smartcard since it is possible that multiple certificates will use the
+same key.
+
+This patch adds the certificate label to the Smartcard authtok item to
+resolve the ambiguity if the key-id is used for multiple certificates.
+
+Resolves: https://github.com/SSSD/sssd/issues/5400
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ src/p11_child/p11_child.h         |  3 +-
+ src/p11_child/p11_child_common.c  | 12 +++--
+ src/p11_child/p11_child_openssl.c | 16 +++++--
+ src/providers/krb5/krb5_child.c   | 14 +++++-
+ src/responder/pam/pamsrv_cmd.c    |  5 +-
+ src/responder/pam/pamsrv_p11.c    |  8 +++-
+ src/sss_client/pam_sss.c          |  3 ++
+ src/tests/cmocka/test_authtok.c   | 36 +++++++++------
+ src/tests/cmocka/test_pam_srv.c   | 65 ++++++++++++++------------
+ src/util/authtok-utils.c          | 30 ++++++++++--
+ src/util/authtok-utils.h          | 11 ++++-
+ src/util/authtok.c                | 77 +++++++++++++++++++++++++------
+ src/util/authtok.h                | 14 +++++-
+ 13 files changed, 214 insertions(+), 80 deletions(-)
+
+diff --git a/src/p11_child/p11_child.h b/src/p11_child/p11_child.h
+index 0b53e70c5..9c0cefe05 100644
+--- a/src/p11_child/p11_child.h
++++ b/src/p11_child/p11_child.h
+@@ -68,7 +68,8 @@ bool do_verification_b64(struct p11_ctx *p11_ctx, const char *cert_b64);
+ errno_t do_card(TALLOC_CTX *mem_ctx, struct p11_ctx *p11_ctx,
+                 enum op_mode mode, const char *pin,
+                 const char *module_name_in, const char *token_name_in,
+-                const char *key_id_in, const char *uri, char **_multi);
++                const char *key_id_in, const char *label,
++                const char *uri, char **_multi);
+ 
+ errno_t parse_cert_verify_opts(TALLOC_CTX *mem_ctx, const char *verify_opts,
+                                struct cert_verify_opts **cert_verify_opts);
+diff --git a/src/p11_child/p11_child_common.c b/src/p11_child/p11_child_common.c
+index 236d7dac4..f17de1a9e 100644
+--- a/src/p11_child/p11_child_common.c
++++ b/src/p11_child/p11_child_common.c
+@@ -60,7 +60,8 @@ static int do_work(TALLOC_CTX *mem_ctx, enum op_mode mode, const char *ca_db,
+                    bool wait_for_card,
+                    const char *cert_b64, const char *pin,
+                    const char *module_name, const char *token_name,
+-                   const char *key_id, const char *uri, char **multi)
++                   const char *key_id, const char *label, const char *uri,
++                   char **multi)
+ {
+     int ret;
+     struct p11_ctx *p11_ctx;
+@@ -91,7 +92,7 @@ static int do_work(TALLOC_CTX *mem_ctx, enum op_mode mode, const char *ca_db,
+         }
+     } else {
+         ret = do_card(mem_ctx, p11_ctx, mode, pin,
+-                      module_name, token_name, key_id, uri, multi);
++                      module_name, token_name, key_id, label, uri, multi);
+     }
+ 
+ done:
+@@ -158,6 +159,7 @@ int main(int argc, const char *argv[])
+     char *module_name = NULL;
+     char *token_name = NULL;
+     char *key_id = NULL;
++    char *label = NULL;
+     char *cert_b64 = NULL;
+     bool wait_for_card = false;
+     char *uri = NULL;
+@@ -194,6 +196,8 @@ int main(int argc, const char *argv[])
+          _("Token name for authentication"), NULL},
+         {"key_id", 0, POPT_ARG_STRING, &key_id, 0,
+          _("Key ID for authentication"), NULL},
++        {"label", 0, POPT_ARG_STRING, &label, 0,
++         _("Label for authentication"), NULL},
+         {"certificate", 0, POPT_ARG_STRING, &cert_b64, 0,
+          _("certificate to verify, base64 encoded"), NULL},
+         {"uri", 0, POPT_ARG_STRING, &uri, 0,
+@@ -340,6 +344,7 @@ int main(int argc, const char *argv[])
+     }
+     talloc_steal(main_ctx, debug_prg_name);
+ 
++    /* We do not require the label, but it is recommended */
+     if (mode == OP_AUTH && (module_name == NULL || token_name == NULL
+                                 || key_id == NULL)) {
+         DEBUG(SSSDBG_FATAL_FAILURE,
+@@ -369,7 +374,8 @@ int main(int argc, const char *argv[])
+     }
+ 
+     ret = do_work(main_ctx, mode, ca_db, cert_verify_opts, wait_for_card,
+-                  cert_b64, pin, module_name, token_name, key_id, uri, &multi);
++                  cert_b64, pin, module_name, token_name, key_id, label, uri,
++                  &multi);
+     if (ret != 0) {
+         DEBUG(SSSDBG_OP_FAILURE, "do_work failed.\n");
+         goto fail;
+diff --git a/src/p11_child/p11_child_openssl.c b/src/p11_child/p11_child_openssl.c
+index 04b3e1467..d81a1a9ea 100644
+--- a/src/p11_child/p11_child_openssl.c
++++ b/src/p11_child/p11_child_openssl.c
+@@ -1587,7 +1587,8 @@ static errno_t wait_for_card(CK_FUNCTION_LIST *module, CK_SLOT_ID *slot_id)
+ errno_t do_card(TALLOC_CTX *mem_ctx, struct p11_ctx *p11_ctx,
+                 enum op_mode mode, const char *pin,
+                 const char *module_name_in, const char *token_name_in,
+-                const char *key_id_in, const char *uri_str, char **_multi)
++                const char *key_id_in, const char *label_in,
++                const char *uri_str, char **_multi)
+ {
+     int ret;
+     size_t c;
+@@ -1845,11 +1846,13 @@ errno_t do_card(TALLOC_CTX *mem_ctx, struct p11_ctx *p11_ctx,
+     DLIST_FOR_EACH(item, all_cert_list) {
+         /* Check if we found the certificates we needed for authentication or
+          * the requested ones for pre-auth. For authentication all attributes
+-         * must be given and match, for pre-auth only the given ones must
+-         * match. */
+-        DEBUG(SSSDBG_TRACE_ALL, "%s %s %s %s %s %s.\n",
++         * except the label must be given and match. The label is optional for
++         * authentication but if given it must match as well. For pre-auth
++         * only the given ones must match. */
++        DEBUG(SSSDBG_TRACE_ALL, "%s %s %s %s %s %s %s.\n",
+               module_name_in, module_file_name, token_name_in, token_name,
+-              key_id_in, item->id);
++              key_id_in, label_in == NULL ? "- no label given-" : label_in,
++              item->id);
+ 
+         if ((mode == OP_AUTH
+                 && module_name_in != NULL
+@@ -1857,6 +1860,9 @@ errno_t do_card(TALLOC_CTX *mem_ctx, struct p11_ctx *p11_ctx,
+                 && key_id_in != NULL
+                 && item->id != NULL
+                 && strcmp(key_id_in, item->id) == 0
++                && (label_in == NULL
++                    || (label_in != NULL && item->label != NULL
++                        && strcmp(label_in, item->label) == 0))
+                 && strcmp(token_name_in, token_name) == 0
+                 && strcmp(module_name_in, module_file_name) == 0)
+             || (mode == OP_PREAUTH
+diff --git a/src/providers/krb5/krb5_child.c b/src/providers/krb5/krb5_child.c
+index 6e2bf6d75..cab7b27a2 100644
+--- a/src/providers/krb5/krb5_child.c
++++ b/src/providers/krb5/krb5_child.c
+@@ -714,7 +714,7 @@ static krb5_error_code answer_pkinit(krb5_context ctx,
+         kerr = sss_authtok_get_sc(kr->pd->authtok, &pin, NULL,
+                                  &token_name, NULL,
+                                  &module_name, NULL,
+-                                 NULL, NULL);
++                                 NULL, NULL, NULL, NULL);
+         if (kerr != EOK) {
+             DEBUG(SSSDBG_OP_FAILURE,
+                   "sss_authtok_get_sc failed.\n");
+@@ -1226,11 +1226,12 @@ static errno_t get_pkinit_identity(TALLOC_CTX *mem_ctx,
+     const char *token_name;
+     const char *module_name;
+     const char *key_id;
++    const char *label;
+ 
+     ret = sss_authtok_get_sc(authtok, NULL, NULL,
+                              &token_name, NULL,
+                              &module_name, NULL,
+-                             &key_id, NULL);
++                             &key_id, NULL, &label, NULL);
+     if (ret != EOK) {
+         DEBUG(SSSDBG_OP_FAILURE, "sss_authtok_get_sc failed.\n");
+         return ret;
+@@ -1267,6 +1268,15 @@ static errno_t get_pkinit_identity(TALLOC_CTX *mem_ctx,
+         }
+     }
+ 
++    if (label != NULL && *label != '\0') {
++        identity = talloc_asprintf_append(identity, ":certlabel=%s", label);
++        if (identity == NULL) {
++            DEBUG(SSSDBG_OP_FAILURE,
++                  "talloc_asprintf_append failed.\n");
++            return ENOMEM;
++        }
++    }
++
+     *_identity = identity;
+ 
+     DEBUG(SSSDBG_TRACE_ALL, "Using pkinit identity [%s].\n", identity);
+diff --git a/src/responder/pam/pamsrv_cmd.c b/src/responder/pam/pamsrv_cmd.c
+index 9ea488be4..d3f092b2b 100644
+--- a/src/responder/pam/pamsrv_cmd.c
++++ b/src/responder/pam/pamsrv_cmd.c
+@@ -1258,7 +1258,7 @@ static errno_t pam_forwarder_parse_data(struct cli_ctx *cctx, struct pam_data *p
+                     || sss_authtok_get_type(pd->authtok)
+                                                == SSS_AUTHTOK_TYPE_SC_KEYPAD)) {
+             ret = sss_authtok_get_sc(pd->authtok, NULL, NULL, NULL, NULL, NULL,
+-                                     NULL, &key_id, NULL);
++                                     NULL, &key_id, NULL, NULL, NULL);
+             if (ret != EOK) {
+                 DEBUG(SSSDBG_OP_FAILURE, "sss_authtok_get_sc failed.\n");
+                 goto done;
+@@ -2274,7 +2274,8 @@ static void pam_dom_forwarder(struct pam_auth_req *preq)
+                                  SSS_AUTHTOK_TYPE_SC_PIN, NULL, 0,
+                                  sss_cai_get_token_name(preq->current_cert), 0,
+                                  sss_cai_get_module_name(preq->current_cert), 0,
+-                                 sss_cai_get_key_id(preq->current_cert), 0);
++                                 sss_cai_get_key_id(preq->current_cert), 0,
++                                 sss_cai_get_label(preq->current_cert), 0);
+                         if (ret != EOK) {
+                             DEBUG(SSSDBG_OP_FAILURE,
+                                   "sss_authtok_set_sc failed, Smartcard "
+diff --git a/src/responder/pam/pamsrv_p11.c b/src/responder/pam/pamsrv_p11.c
+index abc987804..23f94927a 100644
+--- a/src/responder/pam/pamsrv_p11.c
++++ b/src/responder/pam/pamsrv_p11.c
+@@ -727,6 +727,7 @@ struct tevent_req *pam_check_cert_send(TALLOC_CTX *mem_ctx,
+     const char *module_name = NULL;
+     const char *token_name = NULL;
+     const char *key_id = NULL;
++    const char *label = NULL;
+ 
+     req = tevent_req_create(mem_ctx, &state, struct pam_check_cert_state);
+     if (req == NULL) {
+@@ -766,7 +767,8 @@ struct tevent_req *pam_check_cert_send(TALLOC_CTX *mem_ctx,
+     if (sss_authtok_get_type(pd->authtok) == SSS_AUTHTOK_TYPE_SC_PIN
+             || sss_authtok_get_type(pd->authtok) == SSS_AUTHTOK_TYPE_SC_KEYPAD) {
+         ret = sss_authtok_get_sc(pd->authtok, NULL, NULL, &token_name, NULL,
+-                                 &module_name, NULL, &key_id, NULL);
++                                 &module_name, NULL, &key_id, NULL,
++                                 &label, NULL);
+         if (ret != EOK) {
+             DEBUG(SSSDBG_OP_FAILURE, "sss_authtok_get_sc failed.\n");
+             goto done;
+@@ -784,6 +786,10 @@ struct tevent_req *pam_check_cert_send(TALLOC_CTX *mem_ctx,
+             extra_args[arg_c++] = key_id;
+             extra_args[arg_c++] = "--key_id";
+         }
++        if (label != NULL && *label != '\0') {
++            extra_args[arg_c++] = label;
++            extra_args[arg_c++] = "--label";
++        }
+     }
+ 
+     if (pd->cmd == SSS_PAM_AUTHENTICATE) {
+diff --git a/src/sss_client/pam_sss.c b/src/sss_client/pam_sss.c
+index 04dfdb55d..cffbfa770 100644
+--- a/src/sss_client/pam_sss.c
++++ b/src/sss_client/pam_sss.c
+@@ -126,6 +126,7 @@ struct cert_auth_info {
+     char *token_name;
+     char *module_name;
+     char *key_id;
++    char *label;
+     char *prompt_str;
+     char *pam_cert_user;
+     char *choice_list_id;
+@@ -1962,6 +1963,7 @@ static int prompt_sc_pin(pam_handle_t *pamh, struct pam_items *pi)
+         ret = sss_auth_pack_sc_blob(answer, 0, cai->token_name, 0,
+                                     cai->module_name, 0,
+                                     cai->key_id, 0,
++                                    cai->label, 0,
+                                     NULL, 0, &needed_size);
+         if (ret != EAGAIN) {
+             D(("sss_auth_pack_sc_blob failed."));
+@@ -1979,6 +1981,7 @@ static int prompt_sc_pin(pam_handle_t *pamh, struct pam_items *pi)
+         ret = sss_auth_pack_sc_blob(answer, 0, cai->token_name, 0,
+                                     cai->module_name, 0,
+                                     cai->key_id, 0,
++                                    cai->label, 0,
+                                     (uint8_t *) pi->pam_authtok, needed_size,
+                                     &needed_size);
+         if (ret != EOK) {
+diff --git a/src/tests/cmocka/test_authtok.c b/src/tests/cmocka/test_authtok.c
+index a8f5bdee7..a31014eb6 100644
+--- a/src/tests/cmocka/test_authtok.c
++++ b/src/tests/cmocka/test_authtok.c
+@@ -451,25 +451,27 @@ void test_sss_authtok_sc_blobs(void **state)
+     size_t module_name_len;
+     const char *key_id;
+     size_t key_id_len;
++    const char *label;
++    size_t label_len;
+ 
+     ts = talloc_get_type_abort(*state, struct test_state);
+ 
+     ret = sss_auth_pack_sc_blob("abc", 0, "defg", 0, "hijkl", 0, "mnopqr", 0,
+-                                NULL, 0, &needed_size);
++                                "stuvw", 0, NULL, 0, &needed_size);
+     assert_int_equal(ret, EAGAIN);
+ 
+     buf = talloc_size(ts, needed_size);
+     assert_non_null(buf);
+ 
+     ret = sss_auth_pack_sc_blob("abc", 0, "defg", 0, "hijkl", 0, "mnopqr", 0,
+-                                buf, needed_size, &needed_size);
++                                "stuvw", 0, buf, needed_size, &needed_size);
+     assert_int_equal(ret, EOK);
+ 
+ #if __BYTE_ORDER == __LITTLE_ENDIAN
+-    assert_memory_equal(buf, "\4\0\0\0\5\0\0\0\6\0\0\0\7\0\0\0abc\0defg\0hijkl\0mnopqr\0",
++    assert_memory_equal(buf, "\4\0\0\0\5\0\0\0\6\0\0\0\7\0\0\0\6\0\0\0abc\0defg\0hijkl\0mnopqr\0stuvw\0",
+                         needed_size);
+ #else
+-    assert_memory_equal(buf, "\0\0\0\4\0\0\0\5\0\0\0\6\0\0\0\7abc\0defg\0hijkl\0mnopqr\0",
++    assert_memory_equal(buf, "\0\0\0\4\0\0\0\5\0\0\0\6\0\0\0\7\0\0\0\6abc\0defg\0hijkl\0mnopqr\0stuvw\0",
+                         needed_size);
+ #endif
+ 
+@@ -485,7 +487,8 @@ void test_sss_authtok_sc_blobs(void **state)
+     ret = sss_authtok_get_sc(ts->authtoken, &pin, &pin_len,
+                              &token_name, &token_name_len,
+                              &module_name, &module_name_len,
+-                             &key_id, &key_id_len);
++                             &key_id, &key_id_len,
++                             &label, &label_len);
+     assert_int_equal(ret, EOK);
+     assert_int_equal(pin_len, 3);
+     assert_string_equal(pin, "abc");
+@@ -495,11 +498,14 @@ void test_sss_authtok_sc_blobs(void **state)
+     assert_string_equal(module_name, "hijkl");
+     assert_int_equal(key_id_len, 6);
+     assert_string_equal(key_id, "mnopqr");
++    assert_int_equal(label_len, 5);
++    assert_string_equal(label, "stuvw");
+ 
+     ret = sss_authtok_get_sc(ts->authtoken, NULL, NULL,
+                              &token_name, &token_name_len,
+                              &module_name, &module_name_len,
+-                             &key_id, &key_id_len);
++                             &key_id, &key_id_len,
++                             &label, &label_len);
+     assert_int_equal(ret, EOK);
+     assert_int_equal(token_name_len, 4);
+     assert_string_equal(token_name, "defg");
+@@ -507,15 +513,19 @@ void test_sss_authtok_sc_blobs(void **state)
+     assert_string_equal(module_name, "hijkl");
+     assert_int_equal(key_id_len, 6);
+     assert_string_equal(key_id, "mnopqr");
++    assert_int_equal(label_len, 5);
++    assert_string_equal(label, "stuvw");
+ 
+     ret = sss_authtok_get_sc(ts->authtoken, NULL, NULL,
+                              &token_name, NULL,
+                              &module_name, NULL,
+-                             &key_id, NULL);
++                             &key_id, NULL,
++                             &label, NULL);
+     assert_int_equal(ret, EOK);
+     assert_string_equal(token_name, "defg");
+     assert_string_equal(module_name, "hijkl");
+     assert_string_equal(key_id, "mnopqr");
++    assert_string_equal(label, "stuvw");
+ 
+     sss_authtok_set_empty(ts->authtoken);
+     talloc_free(buf);
+@@ -608,14 +618,14 @@ void test_sss_authtok_sc_pin(void **state)
+     assert_int_equal(sss_authtok_get_type(ts->authtoken),
+                      SSS_AUTHTOK_TYPE_SC_PIN);
+     size = sss_authtok_get_size(ts->authtoken);
+-    assert_int_equal(size, 28);
++    assert_int_equal(size, 33);
+ #if __BYTE_ORDER == __LITTLE_ENDIAN
+     assert_memory_equal(sss_authtok_get_data(ts->authtoken),
+-                        "\11\0\0\0\1\0\0\0\1\0\0\0\1\0\0\0" "12345678\0\0\0\0",
++                        "\11\0\0\0\1\0\0\0\1\0\0\0\1\0\0\0\1\0\0\0" "12345678\0\0\0\0\0",
+                         size);
+ #else
+     assert_memory_equal(sss_authtok_get_data(ts->authtoken),
+-                        "\0\0\0\11\0\0\0\1\0\0\0\1\0\0\0\1" "12345678\0\0\0\0",
++                        "\0\0\0\11\0\0\0\1\0\0\0\1\0\0\0\1\0\0\0\1" "12345678\0\0\0\0\0",
+                         size);
+ #endif
+ 
+@@ -624,14 +634,14 @@ void test_sss_authtok_sc_pin(void **state)
+     assert_int_equal(sss_authtok_get_type(ts->authtoken),
+                      SSS_AUTHTOK_TYPE_SC_PIN);
+     size = sss_authtok_get_size(ts->authtoken);
+-    assert_int_equal(size, 25);
++    assert_int_equal(size, 30);
+ #if __BYTE_ORDER == __LITTLE_ENDIAN
+     assert_memory_equal(sss_authtok_get_data(ts->authtoken),
+-                        "\6\0\0\0\1\0\0\0\1\0\0\0\1\0\0\0" "12345\0\0\0\0",
++                        "\6\0\0\0\1\0\0\0\1\0\0\0\1\0\0\0\1\0\0\0" "12345\0\0\0\0\0",
+                         size);
+ #else
+     assert_memory_equal(sss_authtok_get_data(ts->authtoken),
+-                        "\0\0\0\6\0\0\0\1\0\0\0\1\0\0\0\1" "12345\0\0\0\0",
++                        "\0\0\0\6\0\0\0\1\0\0\0\1\0\0\0\1\0\0\0\1" "12345\0\0\0\0\0",
+                         size);
+ #endif
+ 
+diff --git a/src/tests/cmocka/test_pam_srv.c b/src/tests/cmocka/test_pam_srv.c
+index 326deaf1f..cb05042de 100644
+--- a/src/tests/cmocka/test_pam_srv.c
++++ b/src/tests/cmocka/test_pam_srv.c
+@@ -536,7 +536,7 @@ static void mock_input_pam(TALLOC_CTX *mem_ctx,
+ static void mock_input_pam_cert(TALLOC_CTX *mem_ctx, const char *name,
+                                 const char *pin, const char *token_name,
+                                 const char *module_name, const char *key_id,
+-                                const char *service,
++                                const char *label, const char *service,
+                                 acct_cb_t acct_cb, const char *cert)
+ {
+     size_t buf_size;
+@@ -556,14 +556,14 @@ static void mock_input_pam_cert(TALLOC_CTX *mem_ctx, const char *name,
+ 
+     if (pin != NULL) {
+         ret = sss_auth_pack_sc_blob(pin, 0, token_name, 0, module_name, 0,
+-                                    key_id, 0, NULL, 0, &needed_size);
++                                    key_id, 0, label, 0, NULL, 0, &needed_size);
+         assert_int_equal(ret, EAGAIN);
+ 
+         pi.pam_authtok = malloc(needed_size);
+         assert_non_null(pi.pam_authtok);
+ 
+         ret = sss_auth_pack_sc_blob(pin, 0, token_name, 0, module_name, 0,
+-                                    key_id, 0,
++                                    key_id, 0, label, 0,
+                                     (uint8_t *)pi.pam_authtok, needed_size,
+                                     &needed_size);
+         assert_int_equal(ret, EOK);
+@@ -1766,7 +1766,7 @@ void test_pam_preauth_no_logon_name(void **state)
+     int ret;
+ 
+     mock_input_pam_cert(pam_test_ctx, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+-                        NULL);
++                        NULL, NULL);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_PREAUTH);
+     will_return(__wrap_sss_packet_get_body, WRAP_CALL_REAL);
+@@ -1862,7 +1862,7 @@ void test_pam_preauth_cert_nocert(void **state)
+     unsetenv("SOFTHSM2_CONF");
+ 
+     mock_input_pam_cert(pam_test_ctx, "pamuser", NULL, NULL, NULL, NULL, NULL,
+-                        NULL, NULL);
++                        NULL, NULL, NULL);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_PREAUTH);
+     will_return(__wrap_sss_packet_get_body, WRAP_CALL_REAL);
+@@ -2004,7 +2004,7 @@ void test_pam_preauth_cert_nomatch(void **state)
+     set_cert_auth_param(pam_test_ctx->pctx, CA_DB);
+ 
+     mock_input_pam_cert(pam_test_ctx, "pamuser", NULL, NULL, NULL, NULL, NULL,
+-                        test_lookup_by_cert_cb, NULL);
++                        NULL, test_lookup_by_cert_cb, NULL);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_PREAUTH);
+     will_return(__wrap_sss_packet_get_body, WRAP_CALL_REAL);
+@@ -2026,7 +2026,7 @@ void test_pam_preauth_cert_match(void **state)
+     set_cert_auth_param(pam_test_ctx->pctx, CA_DB);
+ 
+     mock_input_pam_cert(pam_test_ctx, "pamuser", NULL, NULL, NULL, NULL, NULL,
+-                        test_lookup_by_cert_cb, SSSD_TEST_CERT_0001);
++                        NULL, test_lookup_by_cert_cb, SSSD_TEST_CERT_0001);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_PREAUTH);
+     will_return(__wrap_sss_packet_get_body, WRAP_CALL_REAL);
+@@ -2048,7 +2048,7 @@ void test_pam_preauth_cert_match_gdm_smartcard(void **state)
+ 
+     set_cert_auth_param(pam_test_ctx->pctx, CA_DB);
+ 
+-    mock_input_pam_cert(pam_test_ctx, "pamuser", NULL, NULL, NULL, NULL,
++    mock_input_pam_cert(pam_test_ctx, "pamuser", NULL, NULL, NULL, NULL, NULL,
+                         "gdm-smartcard", test_lookup_by_cert_cb,
+                         SSSD_TEST_CERT_0001);
+ 
+@@ -2072,7 +2072,7 @@ void test_pam_preauth_cert_match_wrong_user(void **state)
+     set_cert_auth_param(pam_test_ctx->pctx, CA_DB);
+ 
+     mock_input_pam_cert(pam_test_ctx, "pamuser", NULL, NULL, NULL, NULL, NULL,
+-                        test_lookup_by_cert_wrong_user_cb,
++                        NULL, test_lookup_by_cert_wrong_user_cb,
+                         SSSD_TEST_CERT_0001);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_PREAUTH);
+@@ -2104,7 +2104,7 @@ void test_pam_preauth_cert_no_logon_name(void **state)
+      * request will be done with the username found by the certificate
+      * lookup. */
+     mock_input_pam_cert(pam_test_ctx, NULL, NULL, NULL, NULL, NULL, NULL,
+-                        test_lookup_by_cert_cb, SSSD_TEST_CERT_0001);
++                        NULL, test_lookup_by_cert_cb, SSSD_TEST_CERT_0001);
+     mock_account_recv_simple();
+     mock_parse_inp("pamuser", NULL, EOK);
+     mock_parse_inp("pamuser", NULL, EOK);
+@@ -2134,7 +2134,7 @@ void test_pam_preauth_cert_no_logon_name_with_hint(void **state)
+      * during pre-auth and there is no need for an extra mocked response as in
+      * test_pam_preauth_cert_no_logon_name. */
+     mock_input_pam_cert(pam_test_ctx, NULL, NULL, NULL, NULL, NULL, NULL,
+-                        test_lookup_by_cert_cb, SSSD_TEST_CERT_0001);
++                        NULL, test_lookup_by_cert_cb, SSSD_TEST_CERT_0001);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_PREAUTH);
+     will_return(__wrap_sss_packet_get_body, WRAP_CALL_REAL);
+@@ -2155,7 +2155,7 @@ void test_pam_preauth_cert_no_logon_name_double_cert(void **state)
+ 
+     set_cert_auth_param(pam_test_ctx->pctx, CA_DB);
+ 
+-    mock_input_pam_cert(pam_test_ctx, NULL, NULL, NULL, NULL, NULL, NULL,
++    mock_input_pam_cert(pam_test_ctx, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+                         test_lookup_by_cert_double_cb, SSSD_TEST_CERT_0001);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_PREAUTH);
+@@ -2178,7 +2178,7 @@ void test_pam_preauth_cert_no_logon_name_double_cert_with_hint(void **state)
+     set_cert_auth_param(pam_test_ctx->pctx, CA_DB);
+     pam_test_ctx->rctx->domains->user_name_hint = true;
+ 
+-    mock_input_pam_cert(pam_test_ctx, NULL, NULL, NULL, NULL, NULL, NULL,
++    mock_input_pam_cert(pam_test_ctx, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+                         test_lookup_by_cert_double_cb, SSSD_TEST_CERT_0001);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_PREAUTH);
+@@ -2201,7 +2201,7 @@ void test_pam_preauth_no_cert_no_logon_name(void **state)
+     set_cert_auth_param(pam_test_ctx->pctx, "/no/path");
+ 
+     mock_input_pam_cert(pam_test_ctx, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+-                        NULL);
++                        NULL, NULL);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_PREAUTH);
+     will_return(__wrap_sss_packet_get_body, WRAP_CALL_REAL);
+@@ -2223,7 +2223,7 @@ void test_pam_preauth_cert_no_logon_name_no_match(void **state)
+     set_cert_auth_param(pam_test_ctx->pctx, CA_DB);
+ 
+     mock_input_pam_cert(pam_test_ctx, NULL, NULL, NULL, NULL, NULL, NULL,
+-                        test_lookup_by_cert_cb, NULL);
++                        NULL, test_lookup_by_cert_cb, NULL);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_PREAUTH);
+     will_return(__wrap_sss_packet_get_body, WRAP_CALL_REAL);
+@@ -2252,7 +2252,8 @@ void test_pam_cert_auth(void **state)
+      * in the cache and no second request to the backend is needed. */
+     mock_input_pam_cert(pam_test_ctx, "pamuser", "123456", "SSSD Test Token",
+                         TEST_MODULE_NAME,
+-                        "C554C9F82C2A9D58B70921C143304153A8A42F17", NULL,
++                        "C554C9F82C2A9D58B70921C143304153A8A42F17",
++                        "SSSD test cert 0001", NULL,
+                         test_lookup_by_cert_cb, SSSD_TEST_CERT_0001);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_AUTHENTICATE);
+@@ -2289,7 +2290,8 @@ void test_pam_ecc_cert_auth(void **state)
+     mock_input_pam_cert(pam_test_ctx, "pamuser", "123456",
+                         "SSSD Test ECC Token",
+                         TEST_MODULE_NAME,
+-                        "190E513C9A3DFAACDE5D2D0592F0FDFF559C10CB", NULL,
++                        "190E513C9A3DFAACDE5D2D0592F0FDFF559C10CB",
++                        "SSSD test ECC cert 0001", NULL,
+                         test_lookup_by_cert_cb, SSSD_TEST_ECC_CERT_0001);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_AUTHENTICATE);
+@@ -2324,7 +2326,8 @@ void test_pam_cert_auth_no_logon_name(void **state)
+      * in the cache and no second request to the backend is needed. */
+     mock_input_pam_cert(pam_test_ctx, NULL, "123456", "SSSD Test Token",
+                         TEST_MODULE_NAME,
+-                        "C554C9F82C2A9D58B70921C143304153A8A42F17", NULL,
++                        "C554C9F82C2A9D58B70921C143304153A8A42F17",
++                        "SSSD test cert 0001", NULL,
+                         test_lookup_by_cert_cb, SSSD_TEST_CERT_0001);
+ 
+     mock_account_recv_simple();
+@@ -2360,7 +2363,7 @@ void test_pam_cert_auth_no_logon_name_no_key_id(void **state)
+      * to the user entry the lookup by certificate will already find the user
+      * in the cache and no second request to the backend is needed. */
+     mock_input_pam_cert(pam_test_ctx, NULL, "123456", "SSSD Test Token",
+-                        TEST_MODULE_NAME, NULL, NULL,
++                        TEST_MODULE_NAME, NULL, NULL, NULL,
+                         NULL, NULL);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_AUTHENTICATE);
+@@ -2387,7 +2390,8 @@ void test_pam_cert_auth_double_cert(void **state)
+ 
+     mock_input_pam_cert(pam_test_ctx, "pamuser", "123456", "SSSD Test Token",
+                         TEST_MODULE_NAME,
+-                        "C554C9F82C2A9D58B70921C143304153A8A42F17", NULL,
++                        "C554C9F82C2A9D58B70921C143304153A8A42F17",
++                        "SSSD test cert 0001", NULL,
+                         test_lookup_by_cert_double_cb, SSSD_TEST_CERT_0001);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_AUTHENTICATE);
+@@ -2416,7 +2420,7 @@ void test_pam_cert_preauth_2certs_one_mapping(void **state)
+     ret = test_lookup_by_cert_cb(discard_const(SSSD_TEST_CERT_0001));
+     assert_int_equal(ret, EOK);
+     mock_input_pam_cert(pam_test_ctx, "pamuser", NULL, NULL, NULL, NULL, NULL,
+-                        test_lookup_by_cert_cb, NULL);
++                        NULL, test_lookup_by_cert_cb, NULL);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_PREAUTH);
+     will_return(__wrap_sss_packet_get_body, WRAP_CALL_REAL);
+@@ -2439,7 +2443,7 @@ void test_pam_cert_preauth_2certs_two_mappings(void **state)
+     putenv(discard_const("SOFTHSM2_CONF=" ABS_BUILD_DIR "/src/tests/test_CA/softhsm2_two.conf"));
+ 
+     mock_input_pam_cert(pam_test_ctx, "pamuser", NULL, NULL, NULL, NULL, NULL,
+-                        test_lookup_by_cert_cb_2nd_cert_same_user,
++                        NULL, test_lookup_by_cert_cb_2nd_cert_same_user,
+                         SSSD_TEST_CERT_0001);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_PREAUTH);
+@@ -2464,7 +2468,8 @@ void test_pam_cert_auth_2certs_one_mapping(void **state)
+ 
+     mock_input_pam_cert(pam_test_ctx, "pamuser", "123456", "SSSD Test Token",
+                         TEST_MODULE_NAME,
+-                        "C554C9F82C2A9D58B70921C143304153A8A42F17", NULL,
++                        "C554C9F82C2A9D58B70921C143304153A8A42F17",
++                        "SSSD test cert 0001", NULL,
+                         test_lookup_by_cert_double_cb, SSSD_TEST_CERT_0001);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_AUTHENTICATE);
+@@ -2498,7 +2503,7 @@ void test_pam_cert_preauth_uri_token1(void **state)
+     putenv(discard_const("SOFTHSM2_CONF=" ABS_BUILD_DIR "/src/tests/test_CA/softhsm2_2tokens.conf"));
+ 
+     mock_input_pam_cert(pam_test_ctx, "pamuser", NULL, NULL, NULL, NULL, NULL,
+-                        test_lookup_by_cert_cb, SSSD_TEST_CERT_0001);
++                        NULL, test_lookup_by_cert_cb, SSSD_TEST_CERT_0001);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_PREAUTH);
+     will_return(__wrap_sss_packet_get_body, WRAP_CALL_REAL);
+@@ -2528,7 +2533,7 @@ void test_pam_cert_preauth_uri_token2(void **state)
+     putenv(discard_const("SOFTHSM2_CONF=" ABS_BUILD_DIR "/src/tests/test_CA/softhsm2_2tokens.conf"));
+ 
+     mock_input_pam_cert(pam_test_ctx, "pamuser", NULL, NULL, NULL, NULL, NULL,
+-                        test_lookup_by_cert_cb, SSSD_TEST_CERT_0002);
++                        NULL, test_lookup_by_cert_cb, SSSD_TEST_CERT_0002);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_PREAUTH);
+     will_return(__wrap_sss_packet_get_body, WRAP_CALL_REAL);
+@@ -2567,7 +2572,7 @@ void test_pam_preauth_expired_crl_file(void **state)
+     set_cert_auth_param(pam_test_ctx->pctx, CA_DB);
+ 
+     mock_input_pam_cert(pam_test_ctx, "pamuser", NULL, NULL, NULL, NULL, NULL,
+-                        NULL, NULL);
++                        NULL, NULL, NULL);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_PREAUTH);
+     will_return(__wrap_sss_packet_get_body, WRAP_CALL_REAL);
+@@ -2599,7 +2604,7 @@ void test_pam_preauth_expired_crl_file_soft(void **state)
+     set_cert_auth_param(pam_test_ctx->pctx, CA_DB);
+ 
+     mock_input_pam_cert(pam_test_ctx, "pamuser", NULL, NULL, NULL, NULL, NULL,
+-                        test_lookup_by_cert_cb, SSSD_TEST_CERT_0001);
++                        NULL, test_lookup_by_cert_cb, SSSD_TEST_CERT_0001);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_PREAUTH);
+     will_return(__wrap_sss_packet_get_body, WRAP_CALL_REAL);
+@@ -2632,7 +2637,7 @@ void test_pam_preauth_ocsp(void **state)
+     putenv(discard_const("SOFTHSM2_CONF=" ABS_BUILD_DIR "/src/tests/test_CA/softhsm2_ocsp.conf"));
+ 
+     mock_input_pam_cert(pam_test_ctx, "pamuser", NULL, NULL, NULL, NULL, NULL,
+-                        NULL, NULL);
++                        NULL, NULL, NULL);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_PREAUTH);
+     will_return(__wrap_sss_packet_get_body, WRAP_CALL_REAL);
+@@ -2674,7 +2679,7 @@ void test_pam_preauth_ocsp_no_ocsp(void **state)
+     putenv(discard_const("SOFTHSM2_CONF=" ABS_BUILD_DIR "/src/tests/test_CA/softhsm2_ocsp.conf"));
+ 
+     mock_input_pam_cert(pam_test_ctx, "pamuser", NULL, NULL, NULL, NULL, NULL,
+-                        test_lookup_by_cert_cb, SSSD_TEST_CERT_0005);
++                        NULL, test_lookup_by_cert_cb, SSSD_TEST_CERT_0005);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_PREAUTH);
+     will_return(__wrap_sss_packet_get_body, WRAP_CALL_REAL);
+@@ -2708,7 +2713,7 @@ void test_pam_preauth_ocsp_soft_ocsp(void **state)
+     putenv(discard_const("SOFTHSM2_CONF=" ABS_BUILD_DIR "/src/tests/test_CA/softhsm2_ocsp.conf"));
+ 
+     mock_input_pam_cert(pam_test_ctx, "pamuser", NULL, NULL, NULL, NULL, NULL,
+-                        test_lookup_by_cert_cb, SSSD_TEST_CERT_0005);
++                        NULL, test_lookup_by_cert_cb, SSSD_TEST_CERT_0005);
+ 
+     will_return(__wrap_sss_packet_get_cmd, SSS_PAM_PREAUTH);
+     will_return(__wrap_sss_packet_get_body, WRAP_CALL_REAL);
+diff --git a/src/util/authtok-utils.c b/src/util/authtok-utils.c
+index e50f86741..e76bd17c5 100644
+--- a/src/util/authtok-utils.c
++++ b/src/util/authtok-utils.c
+@@ -77,6 +77,7 @@ errno_t sss_auth_pack_sc_blob(const char *pin, size_t pin_len,
+                               const char *token_name, size_t token_name_len,
+                               const char *module_name, size_t module_name_len,
+                               const char *key_id, size_t key_id_len,
++                              const char *label, size_t label_len,
+                               uint8_t *buf, size_t buf_len,
+                               size_t *_sc_blob_len)
+ {
+@@ -88,7 +89,8 @@ errno_t sss_auth_pack_sc_blob(const char *pin, size_t pin_len,
+             || (pin_len != 0 && pin == NULL)
+             || (token_name_len != 0 && token_name == NULL)
+             || (module_name_len != 0 && module_name == NULL)
+-            || (key_id_len != 0 && key_id == NULL)) {
++            || (key_id_len != 0 && key_id == NULL)
++            || (label_len != 0 && label == NULL)) {
+         return EINVAL;
+     }
+ 
+@@ -113,6 +115,11 @@ errno_t sss_auth_pack_sc_blob(const char *pin, size_t pin_len,
+         key_id_len = 0;
+     }
+ 
++    if (label == NULL) {
++        label = "";
++        label_len = 0;
++    }
++
+     /* len should not include the trailing \0 */
+     if (pin_len == 0 || pin[pin_len - 1] == '\0') {
+         pin_len = strlen(pin);
+@@ -130,8 +137,12 @@ errno_t sss_auth_pack_sc_blob(const char *pin, size_t pin_len,
+         key_id_len = strlen(key_id);
+     }
+ 
+-    *_sc_blob_len = pin_len + token_name_len + module_name_len + key_id_len + 4
+-                            + 4 * sizeof(uint32_t);
++    if (label_len == 0 || label[label_len - 1] == '\0') {
++        label_len = strlen(label);
++    }
++
++    *_sc_blob_len = pin_len + token_name_len + module_name_len + key_id_len
++                            + label_len + 5 + 5 * sizeof(uint32_t);
+     if (buf == NULL || buf_len < *_sc_blob_len) {
+         return EAGAIN;
+     }
+@@ -145,6 +156,8 @@ errno_t sss_auth_pack_sc_blob(const char *pin, size_t pin_len,
+     SAFEALIGN_COPY_UINT32(buf + c, &tmp_uint32_t, &c);
+     tmp_uint32_t = (uint32_t) key_id_len + 1;
+     SAFEALIGN_COPY_UINT32(buf + c, &tmp_uint32_t, &c);
++    tmp_uint32_t = (uint32_t) label_len + 1;
++    SAFEALIGN_COPY_UINT32(buf + c, &tmp_uint32_t, &c);
+ 
+     memcpy(buf + c, pin, pin_len);
+     buf[c + pin_len] = '\0';
+@@ -160,6 +173,10 @@ errno_t sss_auth_pack_sc_blob(const char *pin, size_t pin_len,
+ 
+     memcpy(buf + c, key_id, key_id_len);
+     buf[c + key_id_len] = '\0';
++    c += key_id_len +1;
++
++    memcpy(buf + c, label, label_len);
++    buf[c + label_len] = '\0';
+ 
+     return 0;
+ }
+@@ -171,6 +188,7 @@ const char *sss_auth_get_pin_from_sc_blob(uint8_t *blob, size_t blob_len)
+     uint32_t token_name_len;
+     uint32_t module_name_len;
+     uint32_t key_id_len;
++    uint32_t label_len;
+ 
+     if (blob == NULL || blob_len == 0) {
+         return NULL;
+@@ -184,9 +202,11 @@ const char *sss_auth_get_pin_from_sc_blob(uint8_t *blob, size_t blob_len)
+     SAFEALIGN_COPY_UINT32(&token_name_len, blob + c, &c);
+     SAFEALIGN_COPY_UINT32(&module_name_len, blob + c, &c);
+     SAFEALIGN_COPY_UINT32(&key_id_len, blob + c, &c);
++    SAFEALIGN_COPY_UINT32(&label_len, blob + c, &c);
+ 
+-    if (blob_len != 4 * sizeof(uint32_t) + pin_len + token_name_len
+-                                         + module_name_len + key_id_len) {
++    if (blob_len != 5 * sizeof(uint32_t) + pin_len + token_name_len
++                                         + module_name_len + key_id_len
++                                         + label_len) {
+         return NULL;
+     }
+ 
+diff --git a/src/util/authtok-utils.h b/src/util/authtok-utils.h
+index 714c8187e..f3b268f78 100644
+--- a/src/util/authtok-utils.h
++++ b/src/util/authtok-utils.h
+@@ -39,6 +39,9 @@
+  * @param[in]  key_id      Key ID of the certificate
+  * @param[in]  key_id_len  Length of the key id of the certificate, if 0
+  *                         strlen() will be called internally
++ * @param[in]  label       Label of the certificate
++ * @param[in]  label_len   Length of the label of the certificate, if 0
++ *                         strlen() will be called internally
+  * @param[in]  buf         memory buffer of size buf_len, may be NULL
+  * @param[in]  buf_len     size of memory buffer buf
+  *
+@@ -53,6 +56,7 @@ errno_t sss_auth_pack_sc_blob(const char *pin, size_t pin_len,
+                               const char *token_name, size_t token_name_len,
+                               const char *module_name, size_t module_name_len,
+                               const char *key_id, size_t key_id_len,
++                              const char *label, size_t label_len,
+                               uint8_t *buf, size_t buf_len,
+                               size_t *_sc_blob_len);
+ /**
+@@ -112,6 +116,10 @@ errno_t sss_auth_unpack_2fa_blob(TALLOC_CTX *mem_ctx,
+  * @param[out] _token_name_len   Length of the token name
+  * @param[out] _module_name      Name of PKCS#11 module, null terminated
+  * @param[out] _module_name_len  Length of the module name
++ * @param[out] _key_id           Key ID of the certificate, null terminated
++ * @param[out] _key_id_len       Length of the key ID
++ * @param[out] _labe l           Label of the certificate, null terminated
++ * @param[out] _label_len        Length of the label
+  *
+  * @return     EOK       on success
+  *             EINVAL    if input data is not consistent
+@@ -122,7 +130,8 @@ errno_t sss_auth_unpack_sc_blob(TALLOC_CTX *mem_ctx,
+                                  char **pin, size_t *_pin_len,
+                                  char **token_name, size_t *_token_name_len,
+                                  char **module_name, size_t *_module_name_len,
+-                                 char **key_id, size_t *_key_id_len);
++                                 char **key_id, size_t *_key_id_len,
++                                 char **label, size_t *_label_len);
+ 
+ /**
+  * @brief Return a pointer to the PIN string in the memory buffer
+diff --git a/src/util/authtok.c b/src/util/authtok.c
+index f8b44d6d6..7254ed1da 100644
+--- a/src/util/authtok.c
++++ b/src/util/authtok.c
+@@ -503,7 +503,8 @@ errno_t sss_authtok_set_sc(struct sss_auth_token *tok,
+                            const char *pin, size_t pin_len,
+                            const char *token_name, size_t token_name_len,
+                            const char *module_name, size_t module_name_len,
+-                           const char *key_id, size_t key_id_len)
++                           const char *key_id, size_t key_id_len,
++                           const char *label, size_t label_len)
+ {
+     int ret;
+     size_t needed_size;
+@@ -518,7 +519,7 @@ errno_t sss_authtok_set_sc(struct sss_auth_token *tok,
+ 
+     ret = sss_auth_pack_sc_blob(pin, pin_len, token_name, token_name_len,
+                                 module_name, module_name_len,
+-                                key_id, key_id_len, NULL, 0,
++                                key_id, key_id_len, label, label_len, NULL, 0,
+                                 &needed_size);
+     if (ret != EAGAIN) {
+         DEBUG(SSSDBG_OP_FAILURE, "sss_auth_pack_sc_blob failed.\n");
+@@ -533,7 +534,7 @@ errno_t sss_authtok_set_sc(struct sss_auth_token *tok,
+ 
+     ret = sss_auth_pack_sc_blob(pin, pin_len, token_name, token_name_len,
+                                 module_name, module_name_len,
+-                                key_id, key_id_len, tok->data,
++                                key_id, key_id_len, label, label_len, tok->data,
+                                 needed_size, &needed_size);
+     if (ret != EOK) {
+         DEBUG(SSSDBG_OP_FAILURE, "sss_auth_pack_sc_blob failed.\n");
+@@ -560,6 +561,8 @@ errno_t sss_authtok_set_sc_from_blob(struct sss_auth_token *tok,
+     size_t module_name_len;
+     char *key_id = NULL;
+     size_t key_id_len;
++    char *label = NULL;
++    size_t label_len;
+     TALLOC_CTX *tmp_ctx;
+ 
+     if (tok == NULL) {
+@@ -579,7 +582,7 @@ errno_t sss_authtok_set_sc_from_blob(struct sss_auth_token *tok,
+     ret = sss_auth_unpack_sc_blob(tmp_ctx, data, len, &pin, &pin_len,
+                                   &token_name, &token_name_len,
+                                   &module_name, &module_name_len,
+-                                  &key_id, &key_id_len);
++                                  &key_id, &key_id_len, &label, &label_len);
+     if (ret != EOK) {
+         DEBUG(SSSDBG_OP_FAILURE, "sss_auth_unpack_sc_blob failed.\n");
+         goto done;
+@@ -588,7 +591,7 @@ errno_t sss_authtok_set_sc_from_blob(struct sss_auth_token *tok,
+     ret = sss_authtok_set_sc(tok, SSS_AUTHTOK_TYPE_SC_PIN, pin, pin_len,
+                              token_name, token_name_len,
+                              module_name, module_name_len,
+-                             key_id, key_id_len);
++                             key_id, key_id_len, label, label_len);
+ 
+ done:
+     talloc_free(tmp_ctx);
+@@ -607,7 +610,7 @@ errno_t sss_authtok_set_sc_pin(struct sss_auth_token *tok, const char *pin,
+     }
+ 
+     return sss_authtok_set_sc(tok, SSS_AUTHTOK_TYPE_SC_PIN, pin, len,
+-                              NULL, 0, NULL, 0, NULL, 0);
++                              NULL, 0, NULL, 0, NULL, 0, NULL, 0);
+ }
+ 
+ errno_t sss_authtok_get_sc_pin(struct sss_auth_token *tok, const char **_pin,
+@@ -625,7 +628,8 @@ errno_t sss_authtok_get_sc_pin(struct sss_auth_token *tok, const char **_pin,
+         return ENOENT;
+     case SSS_AUTHTOK_TYPE_SC_PIN:
+         ret = sss_authtok_get_sc(tok, &pin, &pin_len,
+-                                 NULL, NULL, NULL, NULL, NULL, NULL);
++                                 NULL, NULL, NULL, NULL, NULL, NULL,
++                                 NULL, NULL);
+         if (ret != EOK) {
+             DEBUG(SSSDBG_OP_FAILURE, "sss_authtok_get_sc failed.\n");
+             return ret;
+@@ -663,13 +667,15 @@ errno_t sss_auth_unpack_sc_blob(TALLOC_CTX *mem_ctx,
+                                  char **pin, size_t *_pin_len,
+                                  char **token_name, size_t *_token_name_len,
+                                  char **module_name, size_t *_module_name_len,
+-                                 char **key_id, size_t *_key_id_len)
++                                 char **key_id, size_t *_key_id_len,
++                                 char **label, size_t *_label_len)
+ {
+     size_t c;
+     uint32_t pin_len;
+     uint32_t token_name_len;
+     uint32_t module_name_len;
+     uint32_t key_id_len;
++    uint32_t label_len;
+ 
+     c = 0;
+ 
+@@ -678,14 +684,16 @@ errno_t sss_auth_unpack_sc_blob(TALLOC_CTX *mem_ctx,
+         token_name_len = 0;
+         module_name_len = 0;
+         key_id_len = 0;
++        label_len = 0;
+     } else if (blob_len > 0
+                 && strnlen((const char *) blob, blob_len) == blob_len - 1) {
+         pin_len = blob_len;
+         token_name_len = 0;
+         module_name_len = 0;
+         key_id_len = 0;
++        label_len = 0;
+     } else {
+-        if (blob_len < 4 * sizeof(uint32_t)) {
++        if (blob_len < 5 * sizeof(uint32_t)) {
+             DEBUG(SSSDBG_CRIT_FAILURE, "Blob too small.\n");
+             return EINVAL;
+         }
+@@ -694,9 +702,11 @@ errno_t sss_auth_unpack_sc_blob(TALLOC_CTX *mem_ctx,
+         SAFEALIGN_COPY_UINT32(&token_name_len, blob + c, &c);
+         SAFEALIGN_COPY_UINT32(&module_name_len, blob + c, &c);
+         SAFEALIGN_COPY_UINT32(&key_id_len, blob + c, &c);
++        SAFEALIGN_COPY_UINT32(&label_len, blob + c, &c);
+ 
+-        if (blob_len != 4 * sizeof(uint32_t) + pin_len + token_name_len
+-                                             + module_name_len + key_id_len) {
++        if (blob_len != 5 * sizeof(uint32_t) + pin_len + token_name_len
++                                             + module_name_len + key_id_len
++                                             + label_len) {
+             DEBUG(SSSDBG_CRIT_FAILURE, "Blob size mismatch.\n");
+             return EINVAL;
+         }
+@@ -756,6 +766,25 @@ errno_t sss_auth_unpack_sc_blob(TALLOC_CTX *mem_ctx,
+         *key_id = NULL;
+     }
+ 
++    if (label_len != 0) {
++        *label = talloc_strndup(mem_ctx,
++                                      (const char *) blob + c + pin_len
++                                                              + token_name_len
++                                                              + module_name_len
++                                                              + key_id_len,
++                                      label_len);
++        if (*label == NULL) {
++            DEBUG(SSSDBG_OP_FAILURE, "talloc_strndup failed.\n");
++            talloc_free(*pin);
++            talloc_free(*token_name);
++            talloc_free(*module_name);
++            talloc_free(*key_id);
++            return ENOMEM;
++        }
++    } else {
++        *label = NULL;
++    }
++
+     /* Re-calculate length for the case where \0 was missing in the blob */
+     if (_pin_len != NULL) {
+         *_pin_len = (*pin == NULL) ? 0 : strlen(*pin);
+@@ -771,6 +800,10 @@ errno_t sss_auth_unpack_sc_blob(TALLOC_CTX *mem_ctx,
+         *_key_id_len = (*key_id == NULL) ? 0 : strlen(*key_id);
+     }
+ 
++    if (_label_len != NULL) {
++        *_label_len = (*label == NULL) ? 0 : strlen(*label);
++    }
++
+     return EOK;
+ }
+ 
+@@ -778,13 +811,15 @@ errno_t sss_authtok_get_sc(struct sss_auth_token *tok,
+                            const char **_pin, size_t *_pin_len,
+                            const char **_token_name, size_t *_token_name_len,
+                            const char **_module_name, size_t *_module_name_len,
+-                           const char **_key_id, size_t *_key_id_len)
++                           const char **_key_id, size_t *_key_id_len,
++                           const char **_label, size_t *_label_len)
+ {
+     size_t c = 0;
+     size_t pin_len;
+     size_t token_name_len;
+     size_t module_name_len;
+     size_t key_id_len;
++    size_t label_len;
+     uint32_t tmp_uint32_t;
+ 
+     if (!tok) {
+@@ -796,7 +831,7 @@ errno_t sss_authtok_get_sc(struct sss_auth_token *tok,
+         return (tok->type == SSS_AUTHTOK_TYPE_EMPTY) ? ENOENT : EACCES;
+     }
+ 
+-    if (tok->length < 4 * sizeof(uint32_t)) {
++    if (tok->length < 5 * sizeof(uint32_t)) {
+         DEBUG(SSSDBG_CRIT_FAILURE, "Blob too small.\n");
+         return EINVAL;
+     }
+@@ -809,9 +844,12 @@ errno_t sss_authtok_get_sc(struct sss_auth_token *tok,
+     module_name_len = tmp_uint32_t -1;
+     SAFEALIGN_COPY_UINT32(&tmp_uint32_t, tok->data + c, &c);
+     key_id_len = tmp_uint32_t -1;
++    SAFEALIGN_COPY_UINT32(&tmp_uint32_t, tok->data + c, &c);
++    label_len = tmp_uint32_t -1;
+ 
+-    if (tok->length != 4 * sizeof(uint32_t) +  4 + pin_len + token_name_len
+-                                         + module_name_len + key_id_len) {
++    if (tok->length != 5 * sizeof(uint32_t) +  5 + pin_len + token_name_len
++                                         + module_name_len + key_id_len
++                                         + label_len) {
+         DEBUG(SSSDBG_CRIT_FAILURE, "Blob size mismatch.\n");
+         return EINVAL;
+     }
+@@ -846,5 +884,14 @@ errno_t sss_authtok_get_sc(struct sss_auth_token *tok,
+         *_key_id_len = key_id_len;
+     }
+ 
++    if (_label != NULL) {
++        *_label = (const char *) tok->data + c + pin_len + 1
++                               + token_name_len + 1 + module_name_len + 1
++                               + key_id_len + 1;
++    }
++    if (_label_len != NULL) {
++        *_label_len = label_len;
++    }
++
+     return EOK;
+ }
+diff --git a/src/util/authtok.h b/src/util/authtok.h
+index f70c9da13..6fd3e9ef0 100644
+--- a/src/util/authtok.h
++++ b/src/util/authtok.h
+@@ -296,6 +296,10 @@ void sss_authtok_set_sc_keypad(struct sss_auth_token *tok);
+  *                        terminated string containing the PKCS#11 key id
+  * @param key_id_len      The length of the key id string, if set to 0 it will be
+  *                        calculated
++ * @param label           A pointer to a const char *, that will point to a null
++ *                        terminated string containing the PKCS#11 label
++ * @param label_len       The length of the label string, if set to 0 it will be
++ *                        calculated
+  *
+  * @return       EOK on success
+  *               EINVAL unexpected or inval input
+@@ -306,7 +310,8 @@ errno_t sss_authtok_set_sc(struct sss_auth_token *tok,
+                            const char *pin, size_t pin_len,
+                            const char *token_name, size_t token_name_len,
+                            const char *module_name, size_t module_name_len,
+-                           const char *key_id, size_t key_id_len);
++                           const char *key_id, size_t key_id_len,
++                           const char *label, size_t label_len);
+ /**
+  * @brief Set a Smart Card authentication data, replacing any previous data
+  *
+@@ -342,6 +347,10 @@ errno_t sss_authtok_set_sc_from_blob(struct sss_auth_token *tok,
+  *                              a null terminated string holding the PKCS#11
+  *                              key id, may not be modified or freed
+  * @param[out] _key_id_len      Length of the PKCS#11 key id
++ * @param[out] _label           A pointer to a const char *, that will point to
++ *                              a null terminated string holding the PKCS#11
++ *                              label, may not be modified or freed
++ * @param[out] _label_len       Length of the PKCS#11 label
+  *
+  * Any of the output pointers may be NULL if the caller does not need the
+  * specific item.
+@@ -356,7 +365,8 @@ errno_t sss_authtok_get_sc(struct sss_auth_token *tok,
+                            const char **_pin, size_t *_pin_len,
+                            const char **_token_name, size_t *_token_name_len,
+                            const char **_module_name, size_t *_module_name_len,
+-                           const char **_key_id, size_t *_key_id_len);
++                           const char **_key_id, size_t *_key_id_len,
++                           const char **_label, size_t *_label_len);
+ 
+ 
+ /**
+-- 
+2.21.3
+

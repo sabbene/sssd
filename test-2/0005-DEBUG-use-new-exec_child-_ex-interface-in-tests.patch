@@ -1,0 +1,64 @@
+From e58853f9ce63fae0c8b219b79be65c760a2f3e7e Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Fri, 5 Jun 2020 13:57:59 +0200
+Subject: [PATCH] DEBUG: use new exec_child(_ex) interface in tests
+
+Resolves: https://github.com/SSSD/sssd/issues/4667
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ src/tests/cmocka/test_child_common.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/src/tests/cmocka/test_child_common.c b/src/tests/cmocka/test_child_common.c
+index 5cf460b50..87cae3405 100644
+--- a/src/tests/cmocka/test_child_common.c
++++ b/src/tests/cmocka/test_child_common.c
+@@ -97,7 +97,7 @@ void test_exec_child(void **state)
+         exec_child(child_tctx,
+                    child_tctx->pipefd_to_child,
+                    child_tctx->pipefd_from_child,
+-                   CHILD_DIR"/"TEST_BIN, 2);
++                   CHILD_DIR"/"TEST_BIN, NULL);
+     } else {
+             do {
+                 errno = 0;
+@@ -168,7 +168,7 @@ static void extra_args_test(struct child_test_ctx *child_tctx,
+         exec_child_ex(child_tctx,
+                       child_tctx->pipefd_to_child,
+                       child_tctx->pipefd_from_child,
+-                      CHILD_DIR"/"TEST_BIN, 2, extra_args,
++                      CHILD_DIR"/"TEST_BIN, NULL, extra_args,
+                       extra_args_only,
+                       STDIN_FILENO, STDOUT_FILENO);
+     } else {
+@@ -291,7 +291,7 @@ void test_exec_child_handler(void **state)
+         exec_child(child_tctx,
+                    child_tctx->pipefd_to_child,
+                    child_tctx->pipefd_from_child,
+-                   CHILD_DIR"/"TEST_BIN, 2);
++                   CHILD_DIR"/"TEST_BIN, NULL);
+     }
+ 
+     ret = child_handler_setup(child_tctx->test_ctx->ev, child_pid,
+@@ -341,7 +341,7 @@ void test_exec_child_echo(void **state)
+         exec_child_ex(child_tctx,
+                       child_tctx->pipefd_to_child,
+                       child_tctx->pipefd_from_child,
+-                      CHILD_DIR"/"TEST_BIN, 2, NULL, false,
++                      CHILD_DIR"/"TEST_BIN, NULL, NULL, false,
+                       STDIN_FILENO, 3);
+     }
+ 
+@@ -474,7 +474,7 @@ void test_sss_child(void **state)
+         exec_child(child_tctx,
+                    child_tctx->pipefd_to_child,
+                    child_tctx->pipefd_from_child,
+-                   CHILD_DIR"/"TEST_BIN, 2);
++                   CHILD_DIR"/"TEST_BIN, NULL);
+     }
+ 
+     ret = sss_child_register(child_tctx, sc_ctx,
+-- 
+2.21.3
+

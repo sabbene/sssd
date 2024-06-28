@@ -1,0 +1,44 @@
+From d8d743870c459b5ff283c89d78b70d1684bd19a9 Mon Sep 17 00:00:00 2001
+From: Tomas Halman <thalman@redhat.com>
+Date: Wed, 13 May 2020 09:45:56 +0200
+Subject: [PATCH] man: Document invalid selinux context for homedirs
+
+The default value of fallback_homedir expands into path, that is not
+expected by selinux. Generally not only selinux might be affected by
+this default value. This PR documents the issue and recommends
+further steps.
+
+Resolves:
+https://github.com/SSSD/sssd/issues/5155
+
+Reviewed-by: Alexey Tikhonov <atikhonov@redhat.com>
+---
+ src/man/include/ad_modified_defaults.xml | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/src/man/include/ad_modified_defaults.xml b/src/man/include/ad_modified_defaults.xml
+index 91623d57a..65c9a0140 100644
+--- a/src/man/include/ad_modified_defaults.xml
++++ b/src/man/include/ad_modified_defaults.xml
+@@ -92,6 +92,18 @@
+                     this fallback behavior, you can explicitly
+                     set "fallback_homedir = %o".
+                 </para>
++                <para>
++                    Note that the system typically expects a home directory
++                    in /home/%u folder. If you decide to use a different
++                    directory structure, some other parts of your system may
++                    need adjustments.
++                </para>
++                <para>
++                    For example automated creation of home directories in
++                    combination with selinux requires selinux adjustment,
++                    otherwise the home directory will be created with wrong
++                    selinux context.
++                </para>
+             </listitem>
+         </itemizedlist>
+     </refsect2>
+-- 
+2.21.3
+

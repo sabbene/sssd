@@ -1,0 +1,68 @@
+From 1b9b7f5a635ede8eee90d13bfe0e1f87e51191a9 Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Fri, 13 Nov 2020 12:59:39 +0100
+Subject: [PATCH 13/16] pam_sss: use unique id for gdm choice list
+
+Currently the key-id read from the Smartcard is used as key value for
+the gdm choice list dialog. Since it might be possible that multiple
+certificates use the same key and hence the same key-id this is not a
+suitable value.
+
+With this patch the string representation of a numerical counter is used.
+
+Resolves: https://github.com/SSSD/sssd/issues/5400
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ src/sss_client/pam_sss.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/src/sss_client/pam_sss.c b/src/sss_client/pam_sss.c
+index b844d257e..04dfdb55d 100644
+--- a/src/sss_client/pam_sss.c
++++ b/src/sss_client/pam_sss.c
+@@ -128,6 +128,7 @@ struct cert_auth_info {
+     char *key_id;
+     char *prompt_str;
+     char *pam_cert_user;
++    char *choice_list_id;
+     struct cert_auth_info *prev;
+     struct cert_auth_info *next;
+ };
+@@ -141,6 +142,7 @@ static void free_cai(struct cert_auth_info *cai)
+         free(cai->module_name);
+         free(cai->key_id);
+         free(cai->prompt_str);
++        free(cai->choice_list_id);
+         free(cai);
+     }
+ }
+@@ -1698,7 +1700,15 @@ static int prompt_multi_cert_gdm(pam_handle_t *pamh, struct pam_items *pi)
+             ret = ENOMEM;
+             goto done;
+         }
+-        request->list.items[c].key = cai->key_id;
++        free(cai->choice_list_id);
++        ret = asprintf(&cai->choice_list_id, "%zu", c);
++        if (ret == -1) {
++            cai->choice_list_id = NULL;
++            ret = ENOMEM;
++            goto done;
++        }
++
++        request->list.items[c].key = cai->choice_list_id;
+         request->list.items[c++].text = prompt;
+     }
+ 
+@@ -1719,7 +1729,7 @@ static int prompt_multi_cert_gdm(pam_handle_t *pamh, struct pam_items *pi)
+     }
+ 
+     DLIST_FOR_EACH(cai, pi->cert_list) {
+-        if (strcmp(response->key, cai->key_id) == 0) {
++        if (strcmp(response->key, cai->choice_list_id) == 0) {
+             pam_info(pamh, "Certificate ‘%s’ selected", cai->key_id);
+             pi->selected_cert = cai;
+             ret = 0;
+-- 
+2.21.3
+

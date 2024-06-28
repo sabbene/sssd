@@ -1,0 +1,42 @@
+From 41f1901230099c2a8b5c4b117bddd993665430cc Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Wed, 10 May 2023 10:27:08 +0200
+Subject: [PATCH] sysdb: fix string comparison when checking for overrides
+
+When checking if the input group-name is the original name from AD or an
+overwritten one the comparison is currently done case sensitive. Since
+AD handles names case-insensitive and hence SSSD should do this as well
+this comparison might cause issues.
+
+The patch replace the case sensitive comparison with a comparison with
+respects the case_sensitive of the domain the object is coming from.
+
+Resolves: https://github.com/SSSD/sssd/issues/6720
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+Reviewed-by: Iker Pedrosa <ipedrosa@redhat.com>
+(cherry picked from commit 01d02794e02f051ea9a78cd63b30384de3e7c9b0)
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ src/db/sysdb_search.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/db/sysdb_search.c b/src/db/sysdb_search.c
+index 7efd570e7..e4c53b853 100644
+--- a/src/db/sysdb_search.c
++++ b/src/db/sysdb_search.c
+@@ -1225,7 +1225,9 @@ int sysdb_getgrnam(TALLOC_CTX *mem_ctx,
+                     res->msgs[0], ORIGINALAD_PREFIX SYSDB_NAME, NULL);
+ 
+             if (originalad_sanitized_name != NULL
+-                    && strcmp(originalad_sanitized_name, sanitized_name) != 0) {
++                    && !sss_string_equal(domain->case_sensitive,
++                                         originalad_sanitized_name,
++                                         sanitized_name)) {
+                 fmt_filter = SYSDB_GRNAM_FILTER;
+                 base_dn = sysdb_group_base_dn(tmp_ctx, domain);
+                 res = NULL;
+-- 
+2.38.1
+

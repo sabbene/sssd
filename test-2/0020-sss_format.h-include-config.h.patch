@@ -1,0 +1,31 @@
+From 45f2eb57dc9068cba13099cab90f1be3f3455442 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pavel=20B=C5=99ezina?= <pbrezina@redhat.com>
+Date: Fri, 2 Oct 2020 14:04:24 +0200
+Subject: [PATCH 20/27] sss_format.h: include config.h
+
+config.h is required for the definitions to work correctly. Compilation
+will fail if sss_format.h is included in a file that does not include
+directly or indirectly config.h
+
+Reviewed-by: Robbie Harwood <rharwood@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+---
+ src/util/sss_format.h | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/util/sss_format.h b/src/util/sss_format.h
+index 5cf080842..9a3041704 100644
+--- a/src/util/sss_format.h
++++ b/src/util/sss_format.h
+@@ -27,6 +27,8 @@
+ #ifndef __SSS_FORMAT_H__
+ #define __SSS_FORMAT_H__
+ 
++#include "config.h"
++
+ #include <inttypes.h>
+ 
+ /* key_serial_t is defined in keyutils.h as typedef int32_t */
+-- 
+2.21.3
+

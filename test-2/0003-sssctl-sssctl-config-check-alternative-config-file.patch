@@ -1,0 +1,137 @@
+From 61f4aaa56ea876fb75c1366c938818b7799408ab Mon Sep 17 00:00:00 2001
+From: Tomas Halman <thalman@redhat.com>
+Date: Wed, 29 Apr 2020 16:40:36 +0200
+Subject: [PATCH] sssctl: sssctl config-check alternative config file
+
+The sssctl config-check now allows to specify alternative config
+file so it can be tested before rewriting system configuration.
+
+    sssctl config-check -c ./sssd.conf
+
+Configuration snippets are looked up in the same place under
+conf.d directory. It would be in ./conf.d/ for the example above.
+
+Resolves:
+https://github.com/SSSD/sssd/issues/5142
+
+Reviewed-by: Pawel Polawski <ppolawsk@redhat.com>
+---
+ src/confdb/confdb.h              |  6 ++--
+ src/tools/sssctl/sssctl_config.c | 56 ++++++++++++++++++++++++++++----
+ 2 files changed, 53 insertions(+), 9 deletions(-)
+
+diff --git a/src/confdb/confdb.h b/src/confdb/confdb.h
+index 0a5593232..a2b58e12a 100644
+--- a/src/confdb/confdb.h
++++ b/src/confdb/confdb.h
+@@ -40,8 +40,10 @@
+ 
+ #define CONFDB_DEFAULT_CFG_FILE_VER 2
+ #define CONFDB_FILE "config.ldb"
+-#define SSSD_CONFIG_FILE SSSD_CONF_DIR"/sssd.conf"
+-#define CONFDB_DEFAULT_CONFIG_DIR SSSD_CONF_DIR"/conf.d"
++#define SSSD_CONFIG_FILE_NAME "sssd.conf"
++#define SSSD_CONFIG_FILE SSSD_CONF_DIR"/"SSSD_CONFIG_FILE_NAME
++#define CONFDB_DEFAULT_CONFIG_DIR_NAME "conf.d"
++#define CONFDB_DEFAULT_CONFIG_DIR SSSD_CONF_DIR"/"CONFDB_DEFAULT_CONFIG_DIR_NAME
+ #define SSSD_MIN_ID 1
+ #define SSSD_LOCAL_MINID 1000
+ #define CONFDB_DEFAULT_SHELL_FALLBACK "/bin/sh"
+diff --git a/src/tools/sssctl/sssctl_config.c b/src/tools/sssctl/sssctl_config.c
+index 74395b61c..de9f3de6e 100644
+--- a/src/tools/sssctl/sssctl_config.c
++++ b/src/tools/sssctl/sssctl_config.c
+@@ -34,6 +34,29 @@
+ 
+ 
+ #ifdef HAVE_LIBINI_CONFIG_V1_3
++
++static char *sssctl_config_snippet_path(TALLOC_CTX *ctx, const char *path)
++{
++    char *tmp = NULL;
++    const char delimiter = '/';
++    char *dpos = NULL;
++
++    tmp = talloc_strdup(ctx, path);
++    if (!tmp) {
++        return NULL;
++    }
++
++    dpos = strrchr(tmp, delimiter);
++    if (dpos != NULL) {
++        ++dpos;
++        *dpos = '\0';
++    } else {
++        *tmp = '\0';
++    }
++
++    return talloc_strdup_append(tmp, CONFDB_DEFAULT_CONFIG_DIR_NAME);
++}
++
+ errno_t sssctl_config_check(struct sss_cmdline *cmdline,
+                             struct sss_tool_ctx *tool_ctx,
+                             void *pvt)
+@@ -47,8 +70,15 @@ errno_t sssctl_config_check(struct sss_cmdline *cmdline,
+     size_t num_ra_error, num_ra_success;
+     char **strs = NULL;
+     TALLOC_CTX *tmp_ctx = NULL;
+-
+-    ret = sss_tool_popt(cmdline, NULL, SSS_TOOL_OPT_OPTIONAL, NULL, NULL);
++    const char *config_path = NULL;
++    const char *config_snippet_path = NULL;
++    struct poptOption long_options[] = {
++        {"config", 'c', POPT_ARG_STRING, &config_path,
++            0, _("Specify a non-default config file"), NULL},
++        POPT_TABLEEND
++    };
++
++    ret = sss_tool_popt(cmdline, long_options, SSS_TOOL_OPT_OPTIONAL, NULL, NULL);
+     if (ret != EOK) {
+         DEBUG(SSSDBG_CRIT_FAILURE, "Unable to parse command arguments\n");
+         return ret;
+@@ -62,17 +92,29 @@ errno_t sssctl_config_check(struct sss_cmdline *cmdline,
+         goto done;
+     }
+ 
++    if (config_path != NULL) {
++        config_snippet_path = sssctl_config_snippet_path(tmp_ctx, config_path);
++        if (config_snippet_path == NULL) {
++            DEBUG(SSSDBG_CRIT_FAILURE, "Unable to create snippet path\n");
++            ret = ENOMEM;
++            goto done;
++        }
++    } else {
++        config_path = SSSD_CONFIG_FILE;
++        config_snippet_path = CONFDB_DEFAULT_CONFIG_DIR;
++    }
++
+     ret = sss_ini_read_sssd_conf(init_data,
+-                                 SSSD_CONFIG_FILE,
+-                                 CONFDB_DEFAULT_CONFIG_DIR);
++                                 config_path,
++                                 config_snippet_path);
+ 
+     if (ret == ERR_INI_OPEN_FAILED) {
+-        PRINT("Failed to open %s\n", SSSD_CONFIG_FILE);
++        PRINT("Failed to open %s\n", config_path);
+         goto done;
+     }
+ 
+     if (!sss_ini_exists(init_data)) {
+-        PRINT("File %1$s does not exist.\n", SSSD_CONFIG_FILE);
++        PRINT("File %1$s does not exist.\n", config_path);
+     }
+ 
+     if (ret == ERR_INI_INVALID_PERMISSION) {
+@@ -83,7 +125,7 @@ errno_t sssctl_config_check(struct sss_cmdline *cmdline,
+ 
+     if (ret == ERR_INI_PARSE_FAILED) {
+         PRINT("Failed to load configuration from %s.\n",
+-              SSSD_CONFIG_FILE);
++              config_path);
+         goto done;
+     }
+ 
+-- 
+2.21.1
+

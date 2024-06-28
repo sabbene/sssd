@@ -1,0 +1,199 @@
+From e07eeea7df55ede36ac0978ac904c1bb11188265 Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Wed, 20 Jan 2021 17:48:44 +0100
+Subject: [PATCH 41/42] responders: add callback to schedule_get_domains_task()
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+To allow responders to run dedicated code at the end of the initial
+getDomains request a callback is added.
+
+Resolves: https://github.com/SSSD/sssd/issues/5469
+
+Reviewed-by: Tomáš Halman <thalman@redhat.com>
+---
+ src/responder/autofs/autofssrv.c             |  2 +-
+ src/responder/common/responder.h             |  5 ++++-
+ src/responder/common/responder_get_domains.c | 12 +++++++++++-
+ src/responder/ifp/ifpsrv.c                   |  2 +-
+ src/responder/nss/nsssrv.c                   |  3 ++-
+ src/responder/pac/pacsrv.c                   |  2 +-
+ src/responder/pam/pamsrv.c                   |  3 ++-
+ src/responder/ssh/sshsrv.c                   |  2 +-
+ src/responder/sudo/sudosrv.c                 |  2 +-
+ src/tests/cmocka/test_responder_common.c     |  2 +-
+ 10 files changed, 25 insertions(+), 10 deletions(-)
+
+diff --git a/src/responder/autofs/autofssrv.c b/src/responder/autofs/autofssrv.c
+index 27de1b44a..130eaf775 100644
+--- a/src/responder/autofs/autofssrv.c
++++ b/src/responder/autofs/autofssrv.c
+@@ -142,7 +142,7 @@ autofs_process_init(TALLOC_CTX *mem_ctx,
+         goto fail;
+     }
+ 
+-    ret = schedule_get_domains_task(rctx, rctx->ev, rctx, NULL);
++    ret = schedule_get_domains_task(rctx, rctx->ev, rctx, NULL, NULL, NULL);
+     if (ret != EOK) {
+         DEBUG(SSSDBG_FATAL_FAILURE, "schedule_get_domains_tasks failed.\n");
+         goto fail;
+diff --git a/src/responder/common/responder.h b/src/responder/common/responder.h
+index f83ba1bc0..ff0559c08 100644
+--- a/src/responder/common/responder.h
++++ b/src/responder/common/responder.h
+@@ -366,10 +366,13 @@ errno_t sss_dp_get_account_domain_recv(TALLOC_CTX *mem_ctx,
+                                        struct tevent_req *req,
+                                        char **_domain);
+ 
++typedef void (get_domains_callback_fn_t)(void *);
+ errno_t schedule_get_domains_task(TALLOC_CTX *mem_ctx,
+                                   struct tevent_context *ev,
+                                   struct resp_ctx *rctx,
+-                                  struct sss_nc_ctx *optional_ncache);
++                                  struct sss_nc_ctx *optional_ncache,
++                                  get_domains_callback_fn_t *callback,
++                                  void *callback_pvt);
+ 
+ errno_t csv_string_to_uid_array(TALLOC_CTX *mem_ctx, const char *csv_string,
+                                 bool allow_sss_loop,
+diff --git a/src/responder/common/responder_get_domains.c b/src/responder/common/responder_get_domains.c
+index e551b0fff..12b6e9028 100644
+--- a/src/responder/common/responder_get_domains.c
++++ b/src/responder/common/responder_get_domains.c
+@@ -430,6 +430,8 @@ static errno_t check_last_request(struct resp_ctx *rctx, const char *hint)
+ struct get_domains_state {
+     struct resp_ctx *rctx;
+     struct sss_nc_ctx *optional_ncache;
++    get_domains_callback_fn_t *callback;
++    void *callback_pvt;
+ };
+ 
+ static void get_domains_at_startup_done(struct tevent_req *req)
+@@ -462,6 +464,10 @@ static void get_domains_at_startup_done(struct tevent_req *req)
+         }
+     }
+ 
++    if (state->callback != NULL) {
++        state->callback(state->callback_pvt);
++    }
++
+     talloc_free(state);
+     return;
+ }
+@@ -489,7 +495,9 @@ static void get_domains_at_startup(struct tevent_context *ev,
+ errno_t schedule_get_domains_task(TALLOC_CTX *mem_ctx,
+                                   struct tevent_context *ev,
+                                   struct resp_ctx *rctx,
+-                                  struct sss_nc_ctx *optional_ncache)
++                                  struct sss_nc_ctx *optional_ncache,
++                                  get_domains_callback_fn_t *callback,
++                                  void *callback_pvt)
+ {
+     struct tevent_immediate *imm;
+     struct get_domains_state *state;
+@@ -500,6 +508,8 @@ errno_t schedule_get_domains_task(TALLOC_CTX *mem_ctx,
+     }
+     state->rctx = rctx;
+     state->optional_ncache = optional_ncache;
++    state->callback = callback;
++    state->callback_pvt = callback_pvt;
+ 
+     imm = tevent_create_immediate(mem_ctx);
+     if (imm == NULL) {
+diff --git a/src/responder/ifp/ifpsrv.c b/src/responder/ifp/ifpsrv.c
+index 7407ee07b..ee1452728 100644
+--- a/src/responder/ifp/ifpsrv.c
++++ b/src/responder/ifp/ifpsrv.c
+@@ -266,7 +266,7 @@ int ifp_process_init(TALLOC_CTX *mem_ctx,
+         return EIO;
+     }
+ 
+-    ret = schedule_get_domains_task(rctx, rctx->ev, rctx, NULL);
++    ret = schedule_get_domains_task(rctx, rctx->ev, rctx, NULL, NULL, NULL);
+     if (ret != EOK) {
+         DEBUG(SSSDBG_FATAL_FAILURE,
+               "schedule_get_domains_tasks failed.\n");
+diff --git a/src/responder/nss/nsssrv.c b/src/responder/nss/nsssrv.c
+index e80104e3d..2b7958e80 100644
+--- a/src/responder/nss/nsssrv.c
++++ b/src/responder/nss/nsssrv.c
+@@ -557,7 +557,8 @@ int nss_process_init(TALLOC_CTX *mem_ctx,
+     }
+     responder_set_fd_limit(fd_limit);
+ 
+-    ret = schedule_get_domains_task(rctx, rctx->ev, rctx, nctx->rctx->ncache);
++    ret = schedule_get_domains_task(rctx, rctx->ev, rctx, nctx->rctx->ncache,
++                                    NULL, NULL);
+     if (ret != EOK) {
+         DEBUG(SSSDBG_FATAL_FAILURE, "schedule_get_domains_tasks failed.\n");
+         goto fail;
+diff --git a/src/responder/pac/pacsrv.c b/src/responder/pac/pacsrv.c
+index 217f83c26..96935150b 100644
+--- a/src/responder/pac/pacsrv.c
++++ b/src/responder/pac/pacsrv.c
+@@ -129,7 +129,7 @@ int pac_process_init(TALLOC_CTX *mem_ctx,
+         goto fail;
+     }
+ 
+-    ret = schedule_get_domains_task(rctx, rctx->ev, rctx, NULL);
++    ret = schedule_get_domains_task(rctx, rctx->ev, rctx, NULL, NULL, NULL);
+     if (ret != EOK) {
+         DEBUG(SSSDBG_FATAL_FAILURE, "schedule_get_domains_tasks failed.\n");
+         goto fail;
+diff --git a/src/responder/pam/pamsrv.c b/src/responder/pam/pamsrv.c
+index de1620e82..8b1ce2e92 100644
+--- a/src/responder/pam/pamsrv.c
++++ b/src/responder/pam/pamsrv.c
+@@ -246,7 +246,8 @@ static int pam_process_init(TALLOC_CTX *mem_ctx,
+     }
+     responder_set_fd_limit(fd_limit);
+ 
+-    ret = schedule_get_domains_task(rctx, rctx->ev, rctx, pctx->rctx->ncache);
++    ret = schedule_get_domains_task(rctx, rctx->ev, rctx, pctx->rctx->ncache,
++                                    NULL, NULL);
+     if (ret != EOK) {
+         DEBUG(SSSDBG_FATAL_FAILURE, "schedule_get_domains_tasks failed.\n");
+         goto done;
+diff --git a/src/responder/ssh/sshsrv.c b/src/responder/ssh/sshsrv.c
+index 6072a702c..e79a0438c 100644
+--- a/src/responder/ssh/sshsrv.c
++++ b/src/responder/ssh/sshsrv.c
+@@ -126,7 +126,7 @@ int ssh_process_init(TALLOC_CTX *mem_ctx,
+         goto fail;
+     }
+ 
+-    ret = schedule_get_domains_task(rctx, rctx->ev, rctx, NULL);
++    ret = schedule_get_domains_task(rctx, rctx->ev, rctx, NULL, NULL, NULL);
+     if (ret != EOK) {
+         DEBUG(SSSDBG_FATAL_FAILURE, "schedule_get_domains_tasks failed.\n");
+         goto fail;
+diff --git a/src/responder/sudo/sudosrv.c b/src/responder/sudo/sudosrv.c
+index 5951b17b1..dc4a44b2f 100644
+--- a/src/responder/sudo/sudosrv.c
++++ b/src/responder/sudo/sudosrv.c
+@@ -102,7 +102,7 @@ int sudo_process_init(TALLOC_CTX *mem_ctx,
+         goto fail;
+     }
+ 
+-    ret = schedule_get_domains_task(rctx, rctx->ev, rctx, NULL);
++    ret = schedule_get_domains_task(rctx, rctx->ev, rctx, NULL, NULL, NULL);
+     if (ret != EOK) {
+         DEBUG(SSSDBG_FATAL_FAILURE, "schedule_get_domains_tasks failed.\n");
+         goto fail;
+diff --git a/src/tests/cmocka/test_responder_common.c b/src/tests/cmocka/test_responder_common.c
+index 5fc0d712d..29356253b 100644
+--- a/src/tests/cmocka/test_responder_common.c
++++ b/src/tests/cmocka/test_responder_common.c
+@@ -265,7 +265,7 @@ void test_schedule_get_domains_task(void **state)
+     ret = schedule_get_domains_task(dummy_ncache_ptr,
+                                     parse_inp_ctx->rctx->ev,
+                                     parse_inp_ctx->rctx,
+-                                    dummy_ncache_ptr);
++                                    dummy_ncache_ptr, NULL, NULL);
+     assert_int_equal(ret, EOK);
+ 
+     ret = test_ev_loop(parse_inp_ctx->tctx);
+-- 
+2.21.3
+

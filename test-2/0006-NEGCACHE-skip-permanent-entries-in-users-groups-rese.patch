@@ -1,0 +1,60 @@
+From 88e92967a7b4e3e4501b17f21812467effa331c7 Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Tue, 16 Jun 2020 13:51:28 +0200
+Subject: [PATCH] NEGCACHE: skip permanent entries in [users/groups] reset
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Files provider calling `sss_ncache_reset_[users/groups]()`
+during cache rebuilding was breaking neg-cache prepopulation.
+
+Resolves: https://github.com/SSSD/sssd/issues/1024
+
+Reviewed-by: Tomáš Halman <thalman@redhat.com>
+---
+ src/responder/common/negcache.c | 9 +++++++++
+ src/responder/common/negcache.h | 1 +
+ 2 files changed, 10 insertions(+)
+
+diff --git a/src/responder/common/negcache.c b/src/responder/common/negcache.c
+index d9545aef6..ce1c0ab8c 100644
+--- a/src/responder/common/negcache.c
++++ b/src/responder/common/negcache.c
+@@ -900,12 +900,21 @@ static int delete_prefix(struct tdb_context *tdb,
+                          TDB_DATA key, TDB_DATA data, void *state)
+ {
+     const char *prefix = (const char *) state;
++    unsigned long long int timestamp;
++    char *ep = NULL;
+ 
+     if (strncmp((char *)key.dptr, prefix, strlen(prefix) - 1) != 0) {
+         /* not interested in this key */
+         return 0;
+     }
+ 
++    errno = 0;
++    timestamp = strtoull((const char *)data.dptr, &ep, 10);
++    if ((errno == 0) && (*ep == '\0') && (timestamp == 0)) {
++        /* skip permanent entries */
++        return 0;
++    }
++
+     return tdb_delete(tdb, key);
+ }
+ 
+diff --git a/src/responder/common/negcache.h b/src/responder/common/negcache.h
+index a80412215..4dcfb5e8f 100644
+--- a/src/responder/common/negcache.h
++++ b/src/responder/common/negcache.h
+@@ -146,6 +146,7 @@ int sss_ncache_set_locate_uid(struct sss_nc_ctx *ctx,
+                               uid_t uid);
+ 
+ int sss_ncache_reset_permanent(struct sss_nc_ctx *ctx);
++/* sss_ncache_reset_[users/groups] skips permanent entries */
+ int sss_ncache_reset_users(struct sss_nc_ctx *ctx);
+ int sss_ncache_reset_groups(struct sss_nc_ctx *ctx);
+ 
+-- 
+2.21.3
+

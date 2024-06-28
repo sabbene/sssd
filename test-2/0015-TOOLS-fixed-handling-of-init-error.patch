@@ -1,0 +1,71 @@
+From bd16242ef6780fd2808bf03f79eda5d940094bc5 Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Sun, 6 Nov 2022 12:25:37 +0100
+Subject: [PATCH 15/16] TOOLS: fixed handling of init error
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Before execution of `tool_cmd_init()` `init_err` wasn't set,
+so `sss_tools_handles_init_error()` check was a no-op.
+
+Consequently, a proper check after `tool_cmd_init()` was missing.
+
+Reviewed-by: Iker Pedrosa <ipedrosa@redhat.com>
+Reviewed-by: Justin Stephenson <jstephen@redhat.com>
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+(cherry picked from commit 7af46ba0e925da61b7b4003c3fa6d51c05c1116e)
+
+Reviewed-by: Iker Pedrosa <ipedrosa@redhat.com>
+Reviewed-by: Justin Stephenson <jstephen@redhat.com>
+---
+ src/tools/common/sss_tools.c | 17 ++++-------------
+ src/tools/common/sss_tools.h |  1 -
+ 2 files changed, 4 insertions(+), 14 deletions(-)
+
+diff --git a/src/tools/common/sss_tools.c b/src/tools/common/sss_tools.c
+index 47b85bdd2..38ae88306 100644
+--- a/src/tools/common/sss_tools.c
++++ b/src/tools/common/sss_tools.c
+@@ -336,22 +336,13 @@ static errno_t sss_tool_route(int argc, const char **argv,
+             cmdline.argc = argc - 2;
+             cmdline.argv = argv + 2;
+ 
+-            if (!sss_tools_handles_init_error(&commands[i], tool_ctx->init_err)) {
+-                DEBUG(SSSDBG_FATAL_FAILURE,
+-                      "Command %s does not handle initialization error [%d] %s\n",
+-                      cmdline.command, tool_ctx->init_err,
+-                      sss_strerror(tool_ctx->init_err));
+-                return tool_ctx->init_err;
+-            }
+-
+             if (!tool_ctx->print_help) {
+                 ret = tool_cmd_init(tool_ctx, &commands[i]);
+-                if (ret == ERR_SYSDB_VERSION_TOO_OLD) {
+-                    tool_ctx->init_err = ret;
+-                } else if (ret != EOK) {
++
++                if (!sss_tools_handles_init_error(&commands[i], ret)) {
+                     DEBUG(SSSDBG_FATAL_FAILURE,
+-                          "Command initialization failed [%d] %s\n",
+-                          ret, sss_strerror(ret));
++                          "Command %s does not handle initialization error [%d] %s\n",
++                          cmdline.command, ret, sss_strerror(ret));
+                     return ret;
+                 }
+             }
+diff --git a/src/tools/common/sss_tools.h b/src/tools/common/sss_tools.h
+index 578186633..75dc15391 100644
+--- a/src/tools/common/sss_tools.h
++++ b/src/tools/common/sss_tools.h
+@@ -30,7 +30,6 @@ struct sss_tool_ctx {
+     struct confdb_ctx *confdb;
+ 
+     bool print_help;
+-    errno_t init_err;
+     char *default_domain;
+     struct sss_domain_info *domains;
+ };
+-- 
+2.37.3
+

@@ -1,0 +1,133 @@
+From 111b8b4d62a4fe192c075e6f6bfacb408e6074b3 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pavel=20B=C5=99ezina?= <pbrezina@redhat.com>
+Date: Tue, 12 Jan 2021 13:50:11 +0100
+Subject: [PATCH 39/39] pam_sss_gssapi: fix coverity issues
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+```
+1. Defect type: RESOURCE_LEAK
+7. sssd-2.4.0/src/sss_client/pam_sss_gss.c:556: leaked_storage: Variable "username" going out of scope leaks the storage it points to.
+Expand
+2. Defect type: RESOURCE_LEAK
+3. sssd-2.4.0/src/sss_client/pam_sss_gss.c:321: leaked_storage: Variable "reply" going out of scope leaks the storage it points to.
+Expand
+3. Defect type: RESOURCE_LEAK
+7. sssd-2.4.0/src/sss_client/pam_sss_gss.c:260: leaked_storage: Variable "username" going out of scope leaks the storage it points to.
+Expand
+4. Defect type: RESOURCE_LEAK
+6. sssd-2.4.0/src/sss_client/pam_sss_gss.c:260: leaked_storage: Variable "upn" going out of scope leaks the storage it points to.
+Expand
+5. Defect type: RESOURCE_LEAK
+7. sssd-2.4.0/src/sss_client/pam_sss_gss.c:260: leaked_storage: Variable "target" going out of scope leaks the storage it points to.
+Expand
+6. Defect type: RESOURCE_LEAK
+7. sssd-2.4.0/src/sss_client/pam_sss_gss.c:260: leaked_storage: Variable "domain" going out of scope leaks the storage it points to.
+
+1. Defect type: CLANG_WARNING
+1. sssd-2.4.0/src/sss_client/pam_sss_gss.c:260:16: warning[unix.Malloc]: Potential leak of memory pointed to by 'username'
+Expand
+2. Defect type: CLANG_WARNING
+1. sssd-2.4.0/src/sss_client/pam_sss_gss.c:260:16: warning[unix.Malloc]: Potential leak of memory pointed to by 'upn'
+Expand
+3. Defect type: CLANG_WARNING
+1. sssd-2.4.0/src/sss_client/pam_sss_gss.c:260:16: warning[unix.Malloc]: Potential leak of memory pointed to by 'target'
+Expand
+4. Defect type: CLANG_WARNING
+1. sssd-2.4.0/src/sss_client/pam_sss_gss.c:260:16: warning[unix.Malloc]: Potential leak of memory pointed to by 'domain'
+```
+
+Also fix compilation warning
+```
+../src/sss_client/pam_sss_gss.c:339:5: warning: ‘reply’ may be used uninitialized in this function [-Wmaybe-uninitialized]
+  339 |     free(reply);
+      |     ^~~~~~~~~~~
+../src/sss_client/pam_sss_gss.c:328:14: note: ‘reply’ was declared here
+  328 |     uint8_t *reply;
+      |              ^~~~~
+../src/sss_client/pam_sss_gss.c:270:11: warning: ‘reply_len’ may be used uninitialized in this function [-Wmaybe-uninitialized]
+  270 |     upn = malloc(reply_len * sizeof(char));
+      |           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../src/sss_client/pam_sss_gss.c:327:12: note: ‘reply_len’ was declared here
+  327 |     size_t reply_len;
+      |            ^~~~~~~~~
+```
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+---
+ src/sss_client/pam_sss_gss.c | 22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
+
+diff --git a/src/sss_client/pam_sss_gss.c b/src/sss_client/pam_sss_gss.c
+index cd38db7da..51be36ece 100644
+--- a/src/sss_client/pam_sss_gss.c
++++ b/src/sss_client/pam_sss_gss.c
+@@ -195,6 +195,8 @@ static errno_t sssd_gssapi_init_send(pam_handle_t *pamh,
+     struct sss_cli_req_data req_data;
+     size_t service_len;
+     size_t user_len;
++    size_t reply_len;
++    uint8_t *reply = NULL;
+     uint8_t *data;
+     errno_t ret;
+     int ret_errno;
+@@ -217,7 +219,7 @@ static errno_t sssd_gssapi_init_send(pam_handle_t *pamh,
+ 
+     req_data.data = data;
+ 
+-    ret = sss_pam_make_request(SSS_GSSAPI_INIT, &req_data, _reply, _reply_len,
++    ret = sss_pam_make_request(SSS_GSSAPI_INIT, &req_data, &reply, &reply_len,
+                                &ret_errno);
+     free(data);
+     if (ret != PAM_SUCCESS) {
+@@ -233,6 +235,16 @@ static errno_t sssd_gssapi_init_send(pam_handle_t *pamh,
+         return (ret_errno != EOK) ? ret_errno : EIO;
+     }
+ 
++    if (ret_errno == EOK) {
++        *_reply = reply;
++        *_reply_len = reply_len;
++    } else {
++        /* We got PAM_SUCCESS therefore the communication with SSSD was
++         * successful and we have received a reply buffer. We just don't care
++         * about it, we are only interested in the error code. */
++        free(reply);
++    }
++
+     return ret_errno;
+ }
+ 
+@@ -257,7 +269,8 @@ static errno_t sssd_gssapi_init_recv(uint8_t *reply,
+     target = malloc(reply_len * sizeof(char));
+     upn = malloc(reply_len * sizeof(char));
+     if (username == NULL || domain == NULL || target == NULL || upn == NULL) {
+-        return ENOMEM;
++        ret = ENOMEM;
++        goto done;
+     }
+ 
+     buf = (const char*)reply;
+@@ -311,8 +324,8 @@ static errno_t sssd_gssapi_init(pam_handle_t *pamh,
+                                 char **_target,
+                                 char **_upn)
+ {
+-    size_t reply_len;
+-    uint8_t *reply;
++    size_t reply_len = 0;
++    uint8_t *reply = NULL;
+     errno_t ret;
+ 
+     ret = sssd_gssapi_init_send(pamh, pam_service, pam_user, &reply,
+@@ -549,6 +562,7 @@ int pam_sm_authenticate(pam_handle_t *pamh,
+ 
+ done:
+     sss_pam_close_fd();
++    free(username);
+     free(domain);
+     free(target);
+     free(upn);
+-- 
+2.21.3
+

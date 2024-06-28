@@ -1,0 +1,89 @@
+From 66c318d212d56e26f303fc52d5fecbde4a6b9589 Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Thu, 10 Nov 2022 22:18:06 +0100
+Subject: [PATCH 16/16] SSSCTL: don't require 'root' for "analyze" cmd
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+:relnote: `sssctl analyze` tool doesn't require anymore to be run under root.
+
+Reviewed-by: Iker Pedrosa <ipedrosa@redhat.com>
+Reviewed-by: Justin Stephenson <jstephen@redhat.com>
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+(cherry picked from commit 99791400bec1054cf0081884e013a3cbed75fe8a)
+
+Reviewed-by: Iker Pedrosa <ipedrosa@redhat.com>
+Reviewed-by: Justin Stephenson <jstephen@redhat.com>
+---
+ src/tools/common/sss_tools.c | 16 +++++++++-------
+ src/tools/common/sss_tools.h |  3 ++-
+ src/tools/sssctl/sssctl.c    |  2 +-
+ 3 files changed, 12 insertions(+), 9 deletions(-)
+
+diff --git a/src/tools/common/sss_tools.c b/src/tools/common/sss_tools.c
+index 38ae88306..d16de7c4d 100644
+--- a/src/tools/common/sss_tools.c
++++ b/src/tools/common/sss_tools.c
+@@ -267,6 +267,15 @@ static int tool_cmd_init(struct sss_tool_ctx *tool_ctx,
+                          struct sss_route_cmd *command)
+ {
+     int ret;
++    uid_t uid;
++
++    if (!(command->flags & SSS_TOOL_FLAG_SKIP_ROOT_CHECK)) {
++        uid = getuid();
++        if (uid != 0) {
++            ERROR("'%s' must be run as root\n", command->command);
++            return EXIT_FAILURE;
++        }
++    }
+ 
+     if (command->flags & SSS_TOOL_FLAG_SKIP_CMD_INIT) {
+         return EOK;
+@@ -515,15 +524,8 @@ int sss_tool_main(int argc, const char **argv,
+                   void *pvt)
+ {
+     struct sss_tool_ctx *tool_ctx;
+-    uid_t uid;
+     errno_t ret;
+ 
+-    uid = getuid();
+-    if (uid != 0) {
+-        ERROR("%1$s must be run as root\n", argv[0]);
+-        return EXIT_FAILURE;
+-    }
+-
+     ret = sss_tool_init(NULL, &argc, argv, &tool_ctx);
+     if (ret != EOK) {
+         DEBUG(SSSDBG_CRIT_FAILURE, "Unable to create tool context\n");
+diff --git a/src/tools/common/sss_tools.h b/src/tools/common/sss_tools.h
+index 75dc15391..24dd4b559 100644
+--- a/src/tools/common/sss_tools.h
++++ b/src/tools/common/sss_tools.h
+@@ -54,7 +54,8 @@ typedef errno_t
+ #define SSS_TOOL_DELIMITER(message) {"", _(message), 0, NULL, 0}
+ #define SSS_TOOL_LAST {NULL, NULL, 0, NULL, 0}
+ 
+-#define SSS_TOOL_FLAG_SKIP_CMD_INIT 0x01
++#define SSS_TOOL_FLAG_SKIP_CMD_INIT   0x01
++#define SSS_TOOL_FLAG_SKIP_ROOT_CHECK 0x02
+ 
+ struct sss_route_cmd {
+     const char *command;
+diff --git a/src/tools/sssctl/sssctl.c b/src/tools/sssctl/sssctl.c
+index f18689f9f..b73d19ffe 100644
+--- a/src/tools/sssctl/sssctl.c
++++ b/src/tools/sssctl/sssctl.c
+@@ -296,7 +296,7 @@ int main(int argc, const char **argv)
+         SSS_TOOL_COMMAND("logs-remove", "Remove existing SSSD log files", 0, sssctl_logs_remove),
+         SSS_TOOL_COMMAND("logs-fetch", "Archive SSSD log files in tarball", 0, sssctl_logs_fetch),
+         SSS_TOOL_COMMAND("debug-level", "Change SSSD debug level", 0, sssctl_debug_level),
+-        SSS_TOOL_COMMAND_FLAGS("analyze", "Analyze logged data", 0, sssctl_analyze, SSS_TOOL_FLAG_SKIP_CMD_INIT),
++        SSS_TOOL_COMMAND_FLAGS("analyze", "Analyze logged data", 0, sssctl_analyze, SSS_TOOL_FLAG_SKIP_CMD_INIT|SSS_TOOL_FLAG_SKIP_ROOT_CHECK),
+ #ifdef HAVE_LIBINI_CONFIG_V1_3
+         SSS_TOOL_DELIMITER("Configuration files tools:"),
+         SSS_TOOL_COMMAND_FLAGS("config-check", "Perform static analysis of SSSD configuration", 0, sssctl_config_check, SSS_TOOL_FLAG_SKIP_CMD_INIT),
+-- 
+2.37.3
+

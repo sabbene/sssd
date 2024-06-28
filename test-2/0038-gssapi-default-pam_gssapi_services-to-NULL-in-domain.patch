@@ -1,0 +1,34 @@
+From cc173629f30fbc885ee90e52a205554b118e0ee6 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pavel=20B=C5=99ezina?= <pbrezina@redhat.com>
+Date: Mon, 11 Jan 2021 13:11:39 +0100
+Subject: [PATCH 38/39] gssapi: default pam_gssapi_services to NULL in domain
+ section
+
+We need to distinguish when the option is not set in domain section and when
+it is is explicitly disabled. Now if it is not set, domain->gssapi_services
+is NULL and we'll use value from the pam section.
+
+Without this change, the value in the pam section is ignored.
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+---
+ src/confdb/confdb.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/confdb/confdb.c b/src/confdb/confdb.c
+index 2881ce5da..befcfff2d 100644
+--- a/src/confdb/confdb.c
++++ b/src/confdb/confdb.c
+@@ -1582,7 +1582,7 @@ static int confdb_get_domain_internal(struct confdb_ctx *cdb,
+     }
+ 
+     tmp = ldb_msg_find_attr_as_string(res->msgs[0], CONFDB_PAM_GSSAPI_SERVICES,
+-                                      "-");
++                                      NULL);
+     if (tmp != NULL) {
+         ret = split_on_separator(domain, tmp, ',', true, true,
+                                  &domain->gssapi_services, NULL);
+-- 
+2.21.3
+

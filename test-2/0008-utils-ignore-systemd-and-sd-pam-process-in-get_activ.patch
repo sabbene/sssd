@@ -1,0 +1,111 @@
+From a56b8d1aaf030fea196b65545dfe207ea10bdf50 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pavel=20B=C5=99ezina?= <pbrezina@redhat.com>
+Date: Fri, 3 Dec 2021 13:38:44 +0100
+Subject: [PATCH] utils: ignore systemd and sd-pam process in
+ get_active_uid_linux()
+
+We iterate processes in /proc to get the list of active users (users
+that has any process running). However, recent change in systemd makes
+systemd and sd-pam process ligner for few more seconds when the user has
+logged out which breaks the no-session functionality in pam responder.
+
+If user is logged in, another process then systemd and sd-pam must be
+running. Therefore we can just ignore these from the list.
+
+```
+admin     351997  0.4  0.0  22648 14636 ?        Ss   13:25   0:00 /usr/lib/systemd/systemd --user
+admin     351999  0.0  0.0 201464  7756 ?        S    13:25   0:00 (sd-pam)
+```
+
+Resolves: https://github.com/SSSD/sssd/issues/5900
+
+:fixes: Quick log out and log in did not correctly refresh
+  user's initgroups in `no_session` PAM schema due to lingering
+  systemd processes.
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+---
+ src/util/find_uid.c | 31 +++++++++++++++++++++++++++++--
+ 1 file changed, 29 insertions(+), 2 deletions(-)
+
+diff --git a/src/util/find_uid.c b/src/util/find_uid.c
+index 38e8f6164..1b506dfc3 100644
+--- a/src/util/find_uid.c
++++ b/src/util/find_uid.c
+@@ -58,7 +58,7 @@ static void hash_talloc_free(void *ptr, void *pvt)
+     talloc_free(ptr);
+ }
+ 
+-static errno_t get_uid_from_pid(const pid_t pid, uid_t *uid)
++static errno_t get_uid_from_pid(const pid_t pid, uid_t *uid, bool *is_systemd)
+ {
+     int ret;
+     char path[PATHLEN];
+@@ -138,6 +138,7 @@ static errno_t get_uid_from_pid(const pid_t pid, uid_t *uid)
+               "close failed [%d][%s].\n", error, strerror(error));
+     }
+ 
++    /* Get uid */
+     p = strstr(buf, "\nUid:\t");
+     if (p != NULL) {
+         p += 6;
+@@ -165,6 +166,24 @@ static errno_t get_uid_from_pid(const pid_t pid, uid_t *uid)
+         return EINVAL;
+     }
+ 
++    /* Get process name. */
++    p = strstr(buf, "Name:\t");
++    if (p == NULL) {
++        DEBUG(SSSDBG_CRIT_FAILURE, "format error\n");
++        return EINVAL;
++    }
++    p += 6;
++    e = strchr(p,'\n');
++    if (e == NULL) {
++        DEBUG(SSSDBG_CRIT_FAILURE, "format error\n");
++        return EINVAL;
++    }
++    if (strncmp(p, "systemd", e-p) == 0 || strncmp(p, "(sd-pam)", e-p) == 0) {
++        *is_systemd = true;
++    } else {
++        *is_systemd = false;
++    }
++
+     *uid = num;
+ 
+     return EOK;
+@@ -215,6 +234,7 @@ static errno_t get_active_uid_linux(hash_table_t *table, uid_t search_uid)
+     struct dirent *dirent;
+     int ret, err;
+     pid_t pid = -1;
++    bool is_systemd;
+     uid_t uid;
+ 
+     hash_key_t key;
+@@ -238,7 +258,7 @@ static errno_t get_active_uid_linux(hash_table_t *table, uid_t search_uid)
+             goto done;
+         }
+ 
+-        ret = get_uid_from_pid(pid, &uid);
++        ret = get_uid_from_pid(pid, &uid, &is_systemd);
+         if (ret != EOK) {
+             /* Most probably this /proc entry disappeared.
+                Anyway, just skip it.
+@@ -248,6 +268,13 @@ static errno_t get_active_uid_linux(hash_table_t *table, uid_t search_uid)
+             continue;
+         }
+ 
++        if (is_systemd) {
++            /* Systemd process may linger for a while even when user.
++             * is logged out. Lets ignore it and focus only
++             * on non-systemd processes. */
++            continue;
++        }
++
+         if (table != NULL) {
+             key.type = HASH_KEY_ULONG;
+             key.ul = (unsigned long) uid;
+-- 
+2.26.3
+

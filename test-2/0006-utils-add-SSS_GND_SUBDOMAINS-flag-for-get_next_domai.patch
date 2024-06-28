@@ -1,0 +1,106 @@
+From 385af99ff4d5a75d0c1edc9ad830da3eb7478295 Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Thu, 8 Oct 2020 17:57:29 +0200
+Subject: [PATCH 6/8] utils: add SSS_GND_SUBDOMAINS flag for get_next_domain()
+
+To allow to only iterate over a singel domain an its sub-domains a new
+flag is added to get_next_domain().
+
+Resolves: https://github.com/SSSD/sssd/issues/5238
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ src/tests/cmocka/test_utils.c | 31 +++++++++++++++++++++++++++++++
+ src/util/domain_info_utils.c  | 10 +++++++---
+ src/util/util.h               |  4 ++++
+ 3 files changed, 42 insertions(+), 3 deletions(-)
+
+diff --git a/src/tests/cmocka/test_utils.c b/src/tests/cmocka/test_utils.c
+index 945f5cb44..d77a972c1 100644
+--- a/src/tests/cmocka/test_utils.c
++++ b/src/tests/cmocka/test_utils.c
+@@ -877,6 +877,37 @@ static void test_get_next_domain_flags(void **state)
+ 
+     dom = get_next_domain(dom, gnd_flags);
+     assert_null(dom);
++
++    /* Descend only to subdomains */
++    gnd_flags = SSS_GND_SUBDOMAINS | SSS_GND_INCLUDE_DISABLED;
++
++    dom = get_next_domain(test_ctx->dom_list, gnd_flags);
++    assert_non_null(dom);
++    assert_string_equal(dom->name, "sub1a");
++
++    dom = get_next_domain(dom, gnd_flags);
++    assert_null(dom);
++
++    dom = find_domain_by_name_ex(test_ctx->dom_list, "dom2", true,
++                                 SSS_GND_ALL_DOMAINS);
++    assert_non_null(dom);
++    assert_string_equal(dom->name, "dom2");
++
++    dom = get_next_domain(dom, gnd_flags);
++    assert_non_null(dom);
++    assert_string_equal(dom->name, "sub2a");
++
++    dom = get_next_domain(dom, gnd_flags);
++    assert_non_null(dom);
++    assert_string_equal(dom->name, "sub2b");
++
++    dom = get_next_domain(dom, gnd_flags);
++    assert_null(dom);
++
++    /* Expect NULL if the domain has no sub-domains */
++    test_ctx->dom_list->subdomains = NULL;
++    dom = get_next_domain(test_ctx->dom_list, gnd_flags);
++    assert_null(dom);
+ }
+ 
+ struct name_init_test_ctx {
+diff --git a/src/util/domain_info_utils.c b/src/util/domain_info_utils.c
+index aa3582f03..4d4726daa 100644
+--- a/src/util/domain_info_utils.c
++++ b/src/util/domain_info_utils.c
+@@ -39,16 +39,20 @@ struct sss_domain_info *get_next_domain(struct sss_domain_info *domain,
+                                         uint32_t gnd_flags)
+ {
+     struct sss_domain_info *dom;
+-    bool descend = gnd_flags & SSS_GND_DESCEND;
++    bool descend = gnd_flags & (SSS_GND_DESCEND | SSS_GND_SUBDOMAINS);
+     bool include_disabled = gnd_flags & SSS_GND_INCLUDE_DISABLED;
++    bool only_subdomains = gnd_flags & SSS_GND_SUBDOMAINS;
+ 
+     dom = domain;
+     while (dom) {
+         if (descend && dom->subdomains) {
+             dom = dom->subdomains;
+-        } else if (dom->next) {
++        } else if (dom->next && only_subdomains && IS_SUBDOMAIN(dom)) {
+             dom = dom->next;
+-        } else if (descend && IS_SUBDOMAIN(dom) && dom->parent->next) {
++        } else if (dom->next && !only_subdomains) {
++            dom = dom->next;
++        } else if (descend && !only_subdomains && IS_SUBDOMAIN(dom)
++                            && dom->parent->next) {
+             dom = dom->parent->next;
+         } else {
+             dom = NULL;
+diff --git a/src/util/util.h b/src/util/util.h
+index fbcac5cd0..581c0edfb 100644
+--- a/src/util/util.h
++++ b/src/util/util.h
+@@ -565,7 +565,11 @@ struct sss_domain_info *get_domains_head(struct sss_domain_info *domain);
+ 
+ #define SSS_GND_DESCEND 0x01
+ #define SSS_GND_INCLUDE_DISABLED 0x02
++/* Descend to sub-domains of current domain but do not go to next parent */
++#define SSS_GND_SUBDOMAINS 0x04
+ #define SSS_GND_ALL_DOMAINS (SSS_GND_DESCEND | SSS_GND_INCLUDE_DISABLED)
++#define SSS_GND_ALL_SUBDOMAINS (SSS_GND_SUBDOMAINS | SSS_GND_INCLUDE_DISABLED)
++
+ struct sss_domain_info *get_next_domain(struct sss_domain_info *domain,
+                                         uint32_t gnd_flags);
+ struct sss_domain_info *find_domain_by_name(struct sss_domain_info *domain,
+-- 
+2.21.3
+

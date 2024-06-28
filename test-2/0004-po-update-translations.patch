@@ -1,0 +1,1249 @@
+From e7069c53235d11e2a8f2b58f2781d303bdbe13b3 Mon Sep 17 00:00:00 2001
+From: Weblate <noreply@weblate.org>
+Date: Wed, 5 Jan 2022 13:23:20 +0100
+Subject: [PATCH] po: update translations
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+(Chinese (Simplified) (zh_CN)) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/zh_CN/
+
+po: update translations
+
+(Japanese) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/ja/
+
+po: update translations
+
+(French) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/fr/
+
+po: update translations
+
+(Finnish) currently translated at 3.5% (93 of 2627 strings)
+Translation: SSSD/sssd-manpage
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-manpage-master/fi/
+
+po: update translations
+
+(Swedish) currently translated at 100.0% (2627 of 2627 strings)
+Translation: SSSD/sssd-manpage
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-manpage-master/sv/
+
+po: update translations
+
+(Swedish) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/sv/
+
+po: update translations
+
+(Korean) currently translated at 14.4% (379 of 2615 strings)
+Translation: SSSD/sssd-manpage
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-manpage-master/ko/
+
+po: update translations
+
+(Korean) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/ko/
+
+po: update translations
+
+(Ukrainian) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/uk/
+
+po: update translations
+
+(Polish) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/pl/
+
+Update translation files
+
+Updated by "Update PO files to match POT (msgmerge)" hook in Weblate.
+
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/
+
+po: update translations
+
+(Korean) currently translated at 14.4% (379 of 2615 strings)
+Translation: SSSD/sssd-manpage
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-manpage-master/ko/
+
+po: update translations
+
+(Korean) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/ko/
+
+po: update translations
+
+(Korean) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/ko/
+
+po: update translations
+
+(Korean) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/ko/
+
+po: update translations
+
+(Finnish) currently translated at 6.1% (38 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/fi/
+
+po: update translations
+
+(Finnish) currently translated at 6.1% (38 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/fi/
+
+po: update translations
+
+(Chinese (Traditional) (zh_TW)) currently translated at 7.9% (49 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/zh_TW/
+
+po: update translations
+
+(Chinese (Simplified) (zh_CN)) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/zh_CN/
+
+po: update translations
+
+(Chinese (Simplified) (zh_CN)) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/zh_CN/
+
+po: update translations
+
+(Chinese (Simplified) (zh_CN)) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/zh_CN/
+
+po: update translations
+
+(Chinese (Simplified) (zh_CN)) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/zh_CN/
+
+po: update translations
+
+(Ukrainian) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/uk/
+
+po: update translations
+
+(Ukrainian) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/uk/
+
+po: update translations
+
+(Turkish) currently translated at 15.1% (94 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/tr/
+
+po: update translations
+
+(Turkish) currently translated at 15.1% (94 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/tr/
+
+po: update translations
+
+(Tajik) currently translated at 0.9% (6 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/tg/
+
+po: update translations
+
+(Swedish) currently translated at 99.0% (613 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/sv/
+
+po: update translations
+
+(Swedish) currently translated at 99.0% (613 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/sv/
+
+po: update translations
+
+(Russian) currently translated at 99.0% (613 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/ru/
+
+po: update translations
+
+(Russian) currently translated at 99.0% (613 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/ru/
+
+po: update translations
+
+(Russian) currently translated at 99.0% (613 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/ru/
+
+po: update translations
+
+(Portuguese (Brazil)) currently translated at 0.8% (5 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/pt_BR/
+
+po: update translations
+
+(Portuguese) currently translated at 15.6% (97 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/pt/
+
+po: update translations
+
+(Polish) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/pl/
+
+po: update translations
+
+(Polish) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/pl/
+
+po: update translations
+
+(Dutch) currently translated at 47.6% (295 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/nl/
+
+po: update translations
+
+(Norwegian Bokmål) currently translated at 2.2% (14 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/nb_NO/
+
+po: update translations
+
+(Japanese) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/ja/
+
+po: update translations
+
+(Japanese) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/ja/
+
+po: update translations
+
+(Japanese) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/ja/
+
+po: update translations
+
+(Italian) currently translated at 19.0% (118 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/it/
+
+po: update translations
+
+(Italian) currently translated at 19.0% (118 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/it/
+
+po: update translations
+
+(Indonesian) currently translated at 8.7% (54 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/id/
+
+po: update translations
+
+(Hungarian) currently translated at 7.1% (44 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/hu/
+
+po: update translations
+
+(French) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/fr/
+
+po: update translations
+
+(French) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/fr/
+
+po: update translations
+
+(French) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/fr/
+
+po: update translations
+
+(French) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/fr/
+
+po: update translations
+
+(Basque) currently translated at 6.7% (42 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/eu/
+
+po: update translations
+
+(Spanish) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/es/
+
+po: update translations
+
+(Spanish) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/es/
+
+po: update translations
+
+(German) currently translated at 51.5% (319 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/de/
+
+po: update translations
+
+(German) currently translated at 51.5% (319 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/de/
+
+po: update translations
+
+(Czech) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/cs/
+
+po: update translations
+
+(Czech) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/cs/
+
+po: update translations
+
+(Czech) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/cs/
+
+po: update translations
+
+(Catalan) currently translated at 55.7% (345 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/ca/
+
+po: update translations
+
+(Bulgarian) currently translated at 15.1% (94 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/bg/
+
+po: update translations
+
+(Ukrainian) currently translated at 100.0% (2627 of 2627 strings)
+Translation: SSSD/sssd-manpage
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-manpage-master/uk/
+
+po: update translations
+
+(Chinese (Simplified) (zh_CN)) currently translated at 100.0% (619 of 619 strings)
+Translation: SSSD/sssd
+Translate-URL: https://translate.fedoraproject.org/projects/sssd/sssd-master/zh_CN/
+---
+ po/cs.po         |   6 +++
+ po/es.po         |   6 +++
+ po/fr.po         |  19 +++++---
+ po/ja.po         |  18 +++++---
+ po/ko.po         |  15 +++---
+ po/pl.po         |  17 ++++---
+ po/sv.po         |  21 ++++-----
+ po/uk.po         |  16 +++++--
+ po/zh_CN.po      |  25 +++++-----
+ src/man/po/fi.po |  10 ++--
+ src/man/po/sv.po | 117 +++++++++++++++++------------------------------
+ src/man/po/uk.po |  21 +++++----
+ 13 files changed, 161 insertions(+), 152 deletions(-)
+
+diff --git a/po/cs.po b/po/cs.po
+index 3a707d70c..abc1f36cc 100644
+--- a/po/cs.po
++++ b/po/cs.po
+@@ -2935,6 +2935,12 @@ msgstr "Informuje, že odpovídač byl aktivován přes dbus"
+ #~ "Je doporučeno použít volbu --logdir vůči identifikátoru tevent řetězce "
+ #~ "podporovaným záznamům událostí v SSSD.\n"
+ 
++#~ msgid ""
++#~ "NOTE: Tevent chain ID support missing, request analysis will be limited.\n"
++#~ msgstr ""
++#~ "POZN.: chybí podpora pro identifikátor tevent řetězce, analýza požadavku "
++#~ "bude jen základní.\n"
++
+ #~ msgid "Timeout for messages sent over the SBUS"
+ #~ msgstr "Časový limit pro zprávy posílané přes SBUS"
+ 
+diff --git a/po/es.po b/po/es.po
+index dfa4f12f2..2a05620bd 100644
+--- a/po/es.po
++++ b/po/es.po
+@@ -2997,6 +2997,12 @@ msgstr "Informa que el contestador ha sido dbus-activated"
+ #~ "Se recomienda usar la opción --logdir contra la ID de la cadena de "
+ #~ "eventos soportada por los registros SSSD.\n"
+ 
++#~ msgid ""
++#~ "NOTE: Tevent chain ID support missing, request analysis will be limited.\n"
++#~ msgstr ""
++#~ "AVISO: Falta el soporte de identificación de la cadena de eventos, el "
++#~ "análisis de solicitudes será limitado.\n"
++
+ #~ msgid "Timeout for messages sent over the SBUS"
+ #~ msgstr "Tiempo máximo para los mensajes enviados a través de SBUS"
+ 
+diff --git a/po/fr.po b/po/fr.po
+index 2687f3c1a..b5c2e531c 100644
+--- a/po/fr.po
++++ b/po/fr.po
+@@ -8,7 +8,7 @@
+ # Fabien Archambault <marbolangos@gmail.com>, 2012
+ # Mariko Vincent <dweu60@gmail.com>, 2012
+ # Jérôme Fenal <jfenal@gmail.com>, 2016. #zanata
+-# Ludek Janda <ljanda@redhat.com>, 2020. #zanata, 2021.
++# Ludek Janda <ljanda@redhat.com>, 2020. #zanata, 2021, 2022.
+ # Pavel Brezina <pbrezina@redhat.com>, 2020. #zanata
+ # Jean-Baptiste Holcroft <jean-baptiste@holcroft.fr>, 2020.
+ # Sundeep Anand <suanand@redhat.com>, 2021.
+@@ -17,7 +17,7 @@ msgstr ""
+ "Project-Id-Version: PACKAGE VERSION\n"
+ "Report-Msgid-Bugs-To: sssd-devel@lists.fedorahosted.org\n"
+ "POT-Creation-Date: 2021-12-23 12:58+0100\n"
+-"PO-Revision-Date: 2021-12-22 07:16+0000\n"
++"PO-Revision-Date: 2022-01-05 12:23+0000\n"
+ "Last-Translator: Ludek Janda <ljanda@redhat.com>\n"
+ "Language-Team: French <https://translate.fedoraproject.org/projects/sssd/"
+ "sssd-master/fr/>\n"
+@@ -26,7 +26,7 @@ msgstr ""
+ "Content-Type: text/plain; charset=UTF-8\n"
+ "Content-Transfer-Encoding: 8bit\n"
+ "Plural-Forms: nplurals=2; plural=n > 1;\n"
+-"X-Generator: Weblate 4.10\n"
++"X-Generator: Weblate 4.10.1\n"
+ 
+ #: src/config/SSSDConfig/sssdoptions.py:20
+ #: src/config/SSSDConfig/sssdoptions.py:21
+@@ -2085,7 +2085,7 @@ msgstr "Utiliser la version personnalisée de krb5_get_init_creds_password"
+ 
+ #: src/providers/krb5/krb5_child.c:3351
+ msgid "Tevent chain ID used for logging purposes"
+-msgstr ""
++msgstr "ID de chaîne Tevent utilisé à des fins de journalisation"
+ 
+ #: src/providers/krb5/krb5_child.c:3379 src/providers/ldap/ldap_child.c:663
+ msgid "talloc_asprintf failed.\n"
+@@ -2762,11 +2762,10 @@ msgid "Specify debug level you want to set"
+ msgstr "Spécifiez le niveau de débogage que vous souhaitez définir"
+ 
+ #: src/tools/sssctl/sssctl_logs.c:398
+-#, fuzzy
+ msgid "ERROR: Tevent chain ID support missing, log analyzer is unsupported.\n"
+ msgstr ""
+-"REMARQUE : Prise en charge de l’ID de chaîne Tevent manquante, l’analyse des "
+-"demandes sera limitée.\n"
++"ERREUR : Prise en charge de l’ID de chaîne Tevent manquante, l’analyseur de "
++"journal n’est pas pris en charge.\n"
+ 
+ #: src/tools/sssctl/sssctl_user_checks.c:117
+ msgid "SSSD InfoPipe user lookup result:\n"
+@@ -3011,6 +3010,12 @@ msgstr "Informe que le répondeur a été activé par un dbus"
+ #~ "Il est recommandé d’utiliser l’option --logdir pour les journaux SSSD "
+ #~ "pris en charge par l’ID de chaîne Tevent.\n"
+ 
++#~ msgid ""
++#~ "NOTE: Tevent chain ID support missing, request analysis will be limited.\n"
++#~ msgstr ""
++#~ "REMARQUE : Prise en charge de l’ID de chaîne Tevent manquante, l’analyse "
++#~ "des demandes sera limitée.\n"
++
+ #~ msgid "Running under %"
+ #~ msgstr "En cours d’exécution sous %"
+ 
+diff --git a/po/ja.po b/po/ja.po
+index 3156fe5a7..699980621 100644
+--- a/po/ja.po
++++ b/po/ja.po
+@@ -6,7 +6,7 @@
+ # Tomoyuki KATO <tomo@dream.daynight.jp>, 2012-2013
+ # Noriko Mizumoto <noriko.mizumoto@gmail.com>, 2016. #zanata
+ # Keiko Moriguchi <kemorigu@redhat.com>, 2019. #zanata
+-# Ludek Janda <ljanda@redhat.com>, 2020. #zanata, 2021.
++# Ludek Janda <ljanda@redhat.com>, 2020. #zanata, 2021, 2022.
+ # Pavel Brezina <pbrezina@redhat.com>, 2020. #zanata
+ # Sundeep Anand <suanand@redhat.com>, 2021.
+ msgid ""
+@@ -14,7 +14,7 @@ msgstr ""
+ "Project-Id-Version: PACKAGE VERSION\n"
+ "Report-Msgid-Bugs-To: sssd-devel@lists.fedorahosted.org\n"
+ "POT-Creation-Date: 2021-12-23 12:58+0100\n"
+-"PO-Revision-Date: 2021-12-22 07:16+0000\n"
++"PO-Revision-Date: 2022-01-05 12:23+0000\n"
+ "Last-Translator: Ludek Janda <ljanda@redhat.com>\n"
+ "Language-Team: Japanese <https://translate.fedoraproject.org/projects/sssd/"
+ "sssd-master/ja/>\n"
+@@ -23,7 +23,7 @@ msgstr ""
+ "Content-Type: text/plain; charset=UTF-8\n"
+ "Content-Transfer-Encoding: 8bit\n"
+ "Plural-Forms: nplurals=1; plural=0;\n"
+-"X-Generator: Weblate 4.10\n"
++"X-Generator: Weblate 4.10.1\n"
+ 
+ #: src/config/SSSDConfig/sssdoptions.py:20
+ #: src/config/SSSDConfig/sssdoptions.py:21
+@@ -1960,7 +1960,7 @@ msgstr "krb5_get_init_creds_password のカスタムバージョンを使用し
+ 
+ #: src/providers/krb5/krb5_child.c:3351
+ msgid "Tevent chain ID used for logging purposes"
+-msgstr ""
++msgstr "デバッグのロギングの冗長性を設定する"
+ 
+ #: src/providers/krb5/krb5_child.c:3379 src/providers/ldap/ldap_child.c:663
+ msgid "talloc_asprintf failed.\n"
+@@ -2629,10 +2629,8 @@ msgid "Specify debug level you want to set"
+ msgstr "設定したいデバッグレベルを指定します"
+ 
+ #: src/tools/sssctl/sssctl_logs.c:398
+-#, fuzzy
+ msgid "ERROR: Tevent chain ID support missing, log analyzer is unsupported.\n"
+-msgstr ""
+-"注記: Tevent チェーン ID サポートがないため、リクエスト分析は制限されます。\n"
++msgstr "エラー: Tevent chain ID サポートがなく、ログアナライザーはサポートされません。\n"
+ 
+ #: src/tools/sssctl/sssctl_user_checks.c:117
+ msgid "SSSD InfoPipe user lookup result:\n"
+@@ -2877,6 +2875,12 @@ msgstr "レスポンダーが dbus でアクティベートされたと知らせ
+ #~ "tevent チェーン ID でサポートされる SSSD ログに対して --logdir オプション"
+ #~ "を使用することが推奨されます。\n"
+ 
++#~ msgid ""
++#~ "NOTE: Tevent chain ID support missing, request analysis will be limited.\n"
++#~ msgstr ""
++#~ "注記: Tevent チェーン ID サポートがないため、リクエスト分析は制限されま"
++#~ "す。\n"
++
+ #~ msgid "Running under %"
+ #~ msgstr "% 化で実行"
+ 
+diff --git a/po/ko.po b/po/ko.po
+index 5a27bab30..2dd7cbd52 100644
+--- a/po/ko.po
++++ b/po/ko.po
+@@ -9,8 +9,8 @@ msgstr ""
+ "Project-Id-Version: PACKAGE VERSION\n"
+ "Report-Msgid-Bugs-To: sssd-devel@lists.fedorahosted.org\n"
+ "POT-Creation-Date: 2021-12-23 12:58+0100\n"
+-"PO-Revision-Date: 2021-12-22 07:16+0000\n"
+-"Last-Translator: Ludek Janda <ljanda@redhat.com>\n"
++"PO-Revision-Date: 2021-12-25 00:16+0000\n"
++"Last-Translator: simmon <simmon@nplob.com>\n"
+ "Language-Team: Korean <https://translate.fedoraproject.org/projects/sssd/"
+ "sssd-master/ko/>\n"
+ "Language: ko\n"
+@@ -18,7 +18,7 @@ msgstr ""
+ "Content-Type: text/plain; charset=UTF-8\n"
+ "Content-Transfer-Encoding: 8bit\n"
+ "Plural-Forms: nplurals=1; plural=0;\n"
+-"X-Generator: Weblate 4.10\n"
++"X-Generator: Weblate 4.10.1\n"
+ 
+ #: src/config/SSSDConfig/sssdoptions.py:20
+ #: src/config/SSSDConfig/sssdoptions.py:21
+@@ -1929,7 +1929,7 @@ msgstr "krb5_get_init_creds_password의 사용자 지정 버전 사용"
+ 
+ #: src/providers/krb5/krb5_child.c:3351
+ msgid "Tevent chain ID used for logging purposes"
+-msgstr ""
++msgstr "로깅 목적을 위해 사용되는 T이벤트 체인 ID"
+ 
+ #: src/providers/krb5/krb5_child.c:3379 src/providers/ldap/ldap_child.c:663
+ msgid "talloc_asprintf failed.\n"
+@@ -2588,9 +2588,8 @@ msgid "Specify debug level you want to set"
+ msgstr "설정할 디버그 수준 지정"
+ 
+ #: src/tools/sssctl/sssctl_logs.c:398
+-#, fuzzy
+ msgid "ERROR: Tevent chain ID support missing, log analyzer is unsupported.\n"
+-msgstr "참고: Tevent 체인 ID 지원이 누락되어 요청 분석이 제한됩니다.\n"
++msgstr "오류: T이벤트 체인 ID 지원이 누락되었으며, 로그 분석이 지원되지 않습니다.\n"
+ 
+ #: src/tools/sssctl/sssctl_user_checks.c:117
+ msgid "SSSD InfoPipe user lookup result:\n"
+@@ -2835,6 +2834,10 @@ msgstr "응답자가 dbus-활성화 되었음을 알립니다"
+ #~ "tevent 체인 ID에서 지원되는 SSSD 로그에 대해 --logdir 옵션을 사용하는 것"
+ #~ "이 좋습니다.\n"
+ 
++#~ msgid ""
++#~ "NOTE: Tevent chain ID support missing, request analysis will be limited.\n"
++#~ msgstr "참고: Tevent 체인 ID 지원이 누락되어 요청 분석이 제한됩니다.\n"
++
+ #~ msgid "Timeout for messages sent over the SBUS"
+ #~ msgstr "SBUS를 통해 전송된 메시지에 시간초과"
+ 
+diff --git a/po/pl.po b/po/pl.po
+index 60c4090b5..89969bf6e 100644
+--- a/po/pl.po
++++ b/po/pl.po
+@@ -16,7 +16,7 @@ msgstr ""
+ "Project-Id-Version: PACKAGE VERSION\n"
+ "Report-Msgid-Bugs-To: sssd-devel@lists.fedorahosted.org\n"
+ "POT-Creation-Date: 2021-12-23 12:58+0100\n"
+-"PO-Revision-Date: 2021-11-11 11:34+0000\n"
++"PO-Revision-Date: 2021-12-24 10:33+0000\n"
+ "Last-Translator: Piotr Drąg <piotrdrag@gmail.com>\n"
+ "Language-Team: Polish <https://translate.fedoraproject.org/projects/sssd/"
+ "sssd-master/pl/>\n"
+@@ -26,7 +26,7 @@ msgstr ""
+ "Content-Transfer-Encoding: 8bit\n"
+ "Plural-Forms: nplurals=3; plural=n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 "
+ "|| n%100>=20) ? 1 : 2;\n"
+-"X-Generator: Weblate 4.8.1\n"
++"X-Generator: Weblate 4.10.1\n"
+ 
+ #: src/config/SSSDConfig/sssdoptions.py:20
+ #: src/config/SSSDConfig/sssdoptions.py:21
+@@ -2025,7 +2025,7 @@ msgstr "Użycie niestandardowej wersji krb5_get_init_creds_password"
+ 
+ #: src/providers/krb5/krb5_child.c:3351
+ msgid "Tevent chain ID used for logging purposes"
+-msgstr ""
++msgstr "Identyfikator łańcucha tevent używany do celów zapisywania w dzienniku"
+ 
+ #: src/providers/krb5/krb5_child.c:3379 src/providers/ldap/ldap_child.c:663
+ msgid "talloc_asprintf failed.\n"
+@@ -2692,11 +2692,10 @@ msgid "Specify debug level you want to set"
+ msgstr "Podaje poziom debugowania do ustawienia"
+ 
+ #: src/tools/sssctl/sssctl_logs.c:398
+-#, fuzzy
+ msgid "ERROR: Tevent chain ID support missing, log analyzer is unsupported.\n"
+ msgstr ""
+-"UWAGA: brak obsługi identyfikatora łańcucha tevent, analiza żądań będzie "
+-"ograniczona.\n"
++"BŁĄD: brak obsługi identyfikatora łańcucha tevent, analizator dziennika jest "
++"nieobsługiwany.\n"
+ 
+ #: src/tools/sssctl/sssctl_user_checks.c:117
+ msgid "SSSD InfoPipe user lookup result:\n"
+@@ -2941,6 +2940,12 @@ msgstr "Informuje, że program odpowiadający został aktywowany magistralą D-B
+ #~ "Zalecane jest używanie opcji --logdir przy dziennikach SSSD obsługujących "
+ #~ "identyfikator łańcucha tevent.\n"
+ 
++#~ msgid ""
++#~ "NOTE: Tevent chain ID support missing, request analysis will be limited.\n"
++#~ msgstr ""
++#~ "UWAGA: brak obsługi identyfikatora łańcucha tevent, analiza żądań będzie "
++#~ "ograniczona.\n"
++
+ #~ msgid "Running under %"
+ #~ msgstr "Uruchamianie jako %"
+ 
+diff --git a/po/sv.po b/po/sv.po
+index 910a89552..d679d83b9 100644
+--- a/po/sv.po
++++ b/po/sv.po
+@@ -13,7 +13,7 @@ msgstr ""
+ "Project-Id-Version: PACKAGE VERSION\n"
+ "Report-Msgid-Bugs-To: sssd-devel@lists.fedorahosted.org\n"
+ "POT-Creation-Date: 2021-12-23 12:58+0100\n"
+-"PO-Revision-Date: 2021-08-08 16:04+0000\n"
++"PO-Revision-Date: 2021-12-31 15:16+0000\n"
+ "Last-Translator: Göran Uddeborg <goeran@uddeborg.se>\n"
+ "Language-Team: Swedish <https://translate.fedoraproject.org/projects/sssd/"
+ "sssd-master/sv/>\n"
+@@ -22,7 +22,7 @@ msgstr ""
+ "Content-Type: text/plain; charset=UTF-8\n"
+ "Content-Transfer-Encoding: 8bit\n"
+ "Plural-Forms: nplurals=2; plural=n != 1;\n"
+-"X-Generator: Weblate 4.7.2\n"
++"X-Generator: Weblate 4.10.1\n"
+ 
+ #: src/config/SSSDConfig/sssdoptions.py:20
+ #: src/config/SSSDConfig/sssdoptions.py:21
+@@ -823,9 +823,8 @@ msgstr ""
+ "servern när den senaste förfrågan inte hittade någon regel"
+ 
+ #: src/config/SSSDConfig/sssdoptions.py:244
+-#, fuzzy
+ msgid "Search base for SUBID ranges"
+-msgstr "Sökbas för vybehållare"
++msgstr "Sökbas för SUBAID-intervall"
+ 
+ #: src/config/SSSDConfig/sssdoptions.py:245
+ msgid "The LDAP attribute that contains FQDN of the host."
+@@ -1951,7 +1950,7 @@ msgstr "Flaggan -g är inkompatibel med -D eller -i\n"
+ #: src/monitor/monitor.c:2401
+ #, c-format
+ msgid "Running under %<PRIu64>, must be root\n"
+-msgstr ""
++msgstr "Kör under %<PRIu64>, måste vara root\n"
+ 
+ #: src/monitor/monitor.c:2483
+ msgid "SSSD is already running\n"
+@@ -1999,7 +1998,7 @@ msgstr "Använd en anpassad version av krb5_get_init_creds_password"
+ 
+ #: src/providers/krb5/krb5_child.c:3351
+ msgid "Tevent chain ID used for logging purposes"
+-msgstr ""
++msgstr "Tevent-kedje-ID använt för loggningssyfte"
+ 
+ #: src/providers/krb5/krb5_child.c:3379 src/providers/ldap/ldap_child.c:663
+ msgid "talloc_asprintf failed.\n"
+@@ -2335,14 +2334,14 @@ msgid "Error while executing external command\n"
+ msgstr "Fel när externt kommando kördes\n"
+ 
+ #: src/tools/sssctl/sssctl.c:123
+-#, fuzzy, c-format
++#, c-format
+ msgid "Error while executing external command '%s'\n"
+-msgstr "Fel när externt kommando kördes\n"
++msgstr "Fel när externt kommando kördes ”%s”\n"
+ 
+ #: src/tools/sssctl/sssctl.c:126
+-#, fuzzy, c-format
++#, c-format
+ msgid "Command '%s' failed with [%d]\n"
+-msgstr "dlsym misslyckades med [%s].\n"
++msgstr "Kommandot ”%s” misslyckades med [%d].\n"
+ 
+ #: src/tools/sssctl/sssctl.c:173
+ msgid "SSSD needs to be running. Start SSSD now?"
+@@ -2665,7 +2664,7 @@ msgstr "Ange felsökningsnivå du vill sätta"
+ 
+ #: src/tools/sssctl/sssctl_logs.c:398
+ msgid "ERROR: Tevent chain ID support missing, log analyzer is unsupported.\n"
+-msgstr ""
++msgstr "FEL: stöd för tevent-kedje-ID saknas, logganalysatorn stödjs inte.\n"
+ 
+ #: src/tools/sssctl/sssctl_user_checks.c:117
+ msgid "SSSD InfoPipe user lookup result:\n"
+diff --git a/po/uk.po b/po/uk.po
+index 9ee86deb0..84e63bcc9 100644
+--- a/po/uk.po
++++ b/po/uk.po
+@@ -16,7 +16,7 @@ msgstr ""
+ "Project-Id-Version: PACKAGE VERSION\n"
+ "Report-Msgid-Bugs-To: sssd-devel@lists.fedorahosted.org\n"
+ "POT-Creation-Date: 2021-12-23 12:58+0100\n"
+-"PO-Revision-Date: 2021-11-12 12:05+0000\n"
++"PO-Revision-Date: 2021-12-25 00:16+0000\n"
+ "Last-Translator: Yuri Chornoivan <yurchor@ukr.net>\n"
+ "Language-Team: Ukrainian <https://translate.fedoraproject.org/projects/sssd/"
+ "sssd-master/uk/>\n"
+@@ -26,7 +26,7 @@ msgstr ""
+ "Content-Transfer-Encoding: 8bit\n"
+ "Plural-Forms: nplurals=3; plural=n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
+ "%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2;\n"
+-"X-Generator: Weblate 4.8.1\n"
++"X-Generator: Weblate 4.10.1\n"
+ 
+ #: src/config/SSSDConfig/sssdoptions.py:20
+ #: src/config/SSSDConfig/sssdoptions.py:21
+@@ -2088,6 +2088,7 @@ msgstr "Використовувати нетипову версію krb5_get_in
+ #: src/providers/krb5/krb5_child.c:3351
+ msgid "Tevent chain ID used for logging purposes"
+ msgstr ""
++"Ідентифікатор ланцюжка Tevent, який використовується для ведення журналу"
+ 
+ #: src/providers/krb5/krb5_child.c:3379 src/providers/ldap/ldap_child.c:663
+ msgid "talloc_asprintf failed.\n"
+@@ -2757,11 +2758,10 @@ msgid "Specify debug level you want to set"
+ msgstr "Вкажіть рівень діагностики, яким ви хочете скористатися"
+ 
+ #: src/tools/sssctl/sssctl_logs.c:398
+-#, fuzzy
+ msgid "ERROR: Tevent chain ID support missing, log analyzer is unsupported.\n"
+ msgstr ""
+-"УВАГА: немає підтримки ідентифікатора черги Tevent, можливості аналізу "
+-"запитів буде обмежено.\n"
++"Помилка: немає підтримки ідентифікатора ланцюжка Tevent, можливість аналізу "
++"журналу недоступна.\n"
+ 
+ #: src/tools/sssctl/sssctl_user_checks.c:117
+ msgid "SSSD InfoPipe user lookup result:\n"
+@@ -3006,6 +3006,12 @@ msgstr "Інформує про те, що на відповідачі заді
+ #~ "Рекомендуємо скористатися параметром --logdir для обробки журналу SSSD із "
+ #~ "підтримкою ідентифікаторів ланцюжка tevent.\n"
+ 
++#~ msgid ""
++#~ "NOTE: Tevent chain ID support missing, request analysis will be limited.\n"
++#~ msgstr ""
++#~ "УВАГА: немає підтримки ідентифікатора черги Tevent, можливості аналізу "
++#~ "запитів буде обмежено.\n"
++
+ #~ msgid "Running under %"
+ #~ msgstr "Запущено від імені %"
+ 
+diff --git a/po/zh_CN.po b/po/zh_CN.po
+index 5f23f62eb..1ade71110 100644
+--- a/po/zh_CN.po
++++ b/po/zh_CN.po
+@@ -4,7 +4,7 @@
+ #
+ # Translators:
+ # Christopher Meng <cickumqt@gmail.com>, 2012
+-# Ludek Janda <ljanda@redhat.com>, 2020. #zanata, 2021.
++# Ludek Janda <ljanda@redhat.com>, 2020. #zanata, 2021, 2022.
+ # Pavel Brezina <pbrezina@redhat.com>, 2020. #zanata
+ # Charles Lee <lchopn@gmail.com>, 2020, 2021.
+ # Sundeep Anand <suanand@redhat.com>, 2021.
+@@ -13,7 +13,7 @@ msgstr ""
+ "Project-Id-Version: PACKAGE VERSION\n"
+ "Report-Msgid-Bugs-To: sssd-devel@lists.fedorahosted.org\n"
+ "POT-Creation-Date: 2021-12-23 12:58+0100\n"
+-"PO-Revision-Date: 2021-12-22 07:16+0000\n"
++"PO-Revision-Date: 2022-01-05 12:23+0000\n"
+ "Last-Translator: Ludek Janda <ljanda@redhat.com>\n"
+ "Language-Team: Chinese (Simplified) <https://translate.fedoraproject.org/"
+ "projects/sssd/sssd-master/zh_CN/>\n"
+@@ -22,7 +22,7 @@ msgstr ""
+ "Content-Type: text/plain; charset=UTF-8\n"
+ "Content-Transfer-Encoding: 8bit\n"
+ "Plural-Forms: nplurals=1; plural=0;\n"
+-"X-Generator: Weblate 4.10\n"
++"X-Generator: Weblate 4.10.1\n"
+ 
+ #: src/config/SSSDConfig/sssdoptions.py:20
+ #: src/config/SSSDConfig/sssdoptions.py:21
+@@ -1007,7 +1007,7 @@ msgstr "Kerberos 备份服务器地址"
+ 
+ #: src/config/SSSDConfig/sssdoptions.py:313
+ msgid "Kerberos realm"
+-msgstr "Kerberos realm"
++msgstr "Kerberos 域"
+ 
+ #: src/config/SSSDConfig/sssdoptions.py:314
+ msgid "Authentication timeout"
+@@ -1071,7 +1071,7 @@ msgstr "启用企业主体"
+ 
+ #: src/config/SSSDConfig/sssdoptions.py:331
+ msgid "Enables using of subdomains realms for authentication"
+-msgstr "启用使用子域域进行验证"
++msgstr "允许使用子域域进行身份验证"
+ 
+ #: src/config/SSSDConfig/sssdoptions.py:332
+ msgid "A mapping from user names to Kerberos principal names"
+@@ -1128,7 +1128,7 @@ msgstr "离线时尝试重新连接的时间间隔"
+ 
+ #: src/config/SSSDConfig/sssdoptions.py:350
+ msgid "Use only the upper case for realm names"
+-msgstr "realm 名称仅使用大写字母"
++msgstr "对于域名称仅使用大写字母"
+ 
+ #: src/config/SSSDConfig/sssdoptions.py:351
+ msgid "File that contains CA certificates"
+@@ -1164,7 +1164,7 @@ msgstr "指定要使用的 sasl 授权 ID"
+ 
+ #: src/config/SSSDConfig/sssdoptions.py:359
+ msgid "Specify the sasl authorization realm to use"
+-msgstr "指定要使用的 sasl 授权 realm"
++msgstr "指定要使用的 sasl 授权域"
+ 
+ #: src/config/SSSDConfig/sssdoptions.py:360
+ msgid "Specify the minimal SSF for LDAP sasl authorization"
+@@ -1876,7 +1876,7 @@ msgstr "组创建 FAST 缓存为"
+ 
+ #: src/providers/krb5/krb5_child.c:3336
+ msgid "Kerberos realm to use"
+-msgstr "使用的 kerberos realm"
++msgstr "要使用的 kerberos 域"
+ 
+ #: src/providers/krb5/krb5_child.c:3338
+ msgid "Requested lifetime of the ticket"
+@@ -1904,7 +1904,7 @@ msgstr "使用自定义版本的 krb5_get_init_creds_password"
+ 
+ #: src/providers/krb5/krb5_child.c:3351
+ msgid "Tevent chain ID used for logging purposes"
+-msgstr ""
++msgstr "用于日志记录的 Tevent 链 ID"
+ 
+ #: src/providers/krb5/krb5_child.c:3379 src/providers/ldap/ldap_child.c:663
+ msgid "talloc_asprintf failed.\n"
+@@ -2558,9 +2558,8 @@ msgid "Specify debug level you want to set"
+ msgstr "指定要设置的调试级别"
+ 
+ #: src/tools/sssctl/sssctl_logs.c:398
+-#, fuzzy
+ msgid "ERROR: Tevent chain ID support missing, log analyzer is unsupported.\n"
+-msgstr "注意：缺少 Tevent 链 ID 支持，请求分析会受到限制。\n"
++msgstr "ERROR：缺少 Tevent 链 ID 支持，不支持日志分析器。\n"
+ 
+ #: src/tools/sssctl/sssctl_user_checks.c:117
+ msgid "SSSD InfoPipe user lookup result:\n"
+@@ -2803,6 +2802,10 @@ msgstr "通知响应者已被 dbus 激活"
+ #~ "supported SSSD logs.\n"
+ #~ msgstr "建议对 tevent 链 ID 支持的 SSSD 日志使用 --logdir 选项。\n"
+ 
++#~ msgid ""
++#~ "NOTE: Tevent chain ID support missing, request analysis will be limited.\n"
++#~ msgstr "注意：缺少 Tevent 链 ID 支持，请求分析会受到限制。\n"
++
+ #~ msgid "Running under %"
+ #~ msgstr "运行于 % 下"
+ 
+diff --git a/src/man/po/fi.po b/src/man/po/fi.po
+index 6ebf97280..e5c596767 100644
+--- a/src/man/po/fi.po
++++ b/src/man/po/fi.po
+@@ -4,7 +4,7 @@ msgstr ""
+ "Project-Id-Version: sssd-docs 2.3.0\n"
+ "Report-Msgid-Bugs-To: sssd-devel@redhat.com\n"
+ "POT-Creation-Date: 2021-12-20 16:05+0100\n"
+-"PO-Revision-Date: 2021-09-14 13:04+0000\n"
++"PO-Revision-Date: 2022-01-02 20:16+0000\n"
+ "Last-Translator: Jan Kuparinen <copper_fin@hotmail.com>\n"
+ "Language-Team: Finnish <https://translate.fedoraproject.org/projects/sssd/"
+ "sssd-manpage-master/fi/>\n"
+@@ -13,7 +13,7 @@ msgstr ""
+ "Content-Type: text/plain; charset=UTF-8\n"
+ "Content-Transfer-Encoding: 8bit\n"
+ "Plural-Forms: nplurals=2; plural=n != 1;\n"
+-"X-Generator: Weblate 4.8\n"
++"X-Generator: Weblate 4.10.1\n"
+ 
+ #. type: Content of: <reference><title>
+ #: sssd.conf.5.xml:5 sssd-ldap.5.xml:5 pam_sss.8.xml:5 pam_sss_gss.8.xml:5
+@@ -1393,7 +1393,7 @@ msgstr ""
+ #. type: Content of: <reference><refentry><refsect1><refsect2><variablelist><varlistentry><term>
+ #: sssd.conf.5.xml:1115
+ msgid "default_shell"
+-msgstr ""
++msgstr "Oletuskomentorivitulkki"
+ 
+ #. type: Content of: <reference><refentry><refsect1><refsect2><variablelist><varlistentry><listitem><para>
+ #: sssd.conf.5.xml:1118
+@@ -11978,7 +11978,7 @@ msgstr ""
+ #. type: Content of: <reference><refentry><refsect1><para><variablelist><varlistentry><listitem><para><variablelist><varlistentry><listitem><para>
+ #: sssd-krb5.5.xml:174
+ msgid "principal name"
+-msgstr ""
++msgstr "ensisijaisen nimi"
+ 
+ #. type: Content of: <reference><refentry><refsect1><para><variablelist><varlistentry><listitem><para><variablelist><varlistentry><term>
+ #: sssd-krb5.5.xml:178
+@@ -11988,7 +11988,7 @@ msgstr ""
+ #. type: Content of: <reference><refentry><refsect1><para><variablelist><varlistentry><listitem><para><variablelist><varlistentry><listitem><para>
+ #: sssd-krb5.5.xml:179
+ msgid "realm name"
+-msgstr ""
++msgstr "alueen nimi"
+ 
+ #. type: Content of: <reference><refentry><refsect1><para><variablelist><varlistentry><listitem><para><variablelist><varlistentry><term>
+ #: sssd-krb5.5.xml:182
+diff --git a/src/man/po/sv.po b/src/man/po/sv.po
+index 9123017be..a96d14770 100644
+--- a/src/man/po/sv.po
++++ b/src/man/po/sv.po
+@@ -7,7 +7,7 @@ msgstr ""
+ "Project-Id-Version: sssd-docs 2.3.0\n"
+ "Report-Msgid-Bugs-To: sssd-devel@redhat.com\n"
+ "POT-Creation-Date: 2021-12-20 16:05+0100\n"
+-"PO-Revision-Date: 2021-09-17 22:04+0000\n"
++"PO-Revision-Date: 2021-12-31 15:16+0000\n"
+ "Last-Translator: Göran Uddeborg <goeran@uddeborg.se>\n"
+ "Language-Team: Swedish <https://translate.fedoraproject.org/projects/sssd/"
+ "sssd-manpage-master/sv/>\n"
+@@ -16,7 +16,7 @@ msgstr ""
+ "Content-Type: text/plain; charset=UTF-8\n"
+ "Content-Transfer-Encoding: 8bit\n"
+ "Plural-Forms: nplurals=2; plural=n != 1;\n"
+-"X-Generator: Weblate 4.8\n"
++"X-Generator: Weblate 4.10.1\n"
+ 
+ #. type: Content of: <reference><title>
+ #: sssd.conf.5.xml:5 sssd-ldap.5.xml:5 pam_sss.8.xml:5 pam_sss_gss.8.xml:5
+@@ -678,6 +678,9 @@ msgid ""
+ "e. accessible via <quote>files</quote> service of <filename>nsswitch.conf</"
+ "filename>."
+ msgstr ""
++"Både ett användarnamn och ett aid kan användas men användaren skall vara "
++"lokal, d.v.s. åtkomlig via tjänsten <quote>files</quote> i <filename>nsswitch"
++".conf</filename>."
+ 
+ #. type: Content of: <reference><refentry><refsect1><refsect2><para><variablelist><varlistentry><listitem><para>
+ #: sssd.conf.5.xml:433
+@@ -3174,6 +3177,8 @@ msgid ""
+ "Local user names are required, i.e. accessible via <quote>files</quote> "
+ "service of <filename>nsswitch.conf</filename>."
+ msgstr ""
++"Lokalt användarnamn krävs, d.v.s. åtkomligt via tjänsten <quote>files</"
++"quote> i <filename>nsswitch.conf</filename>."
+ 
+ #. type: Content of: <reference><refentry><refsect1><refsect2><variablelist><varlistentry><listitem><para>
+ #: sssd.conf.5.xml:2177
+@@ -4800,6 +4805,8 @@ msgstr ""
+ msgid ""
+ "The AD provider will use this option for the CLDAP ping timeouts as well."
+ msgstr ""
++"AD-leverantören kommer även att använda detta alternativ för CLDAP-"
++"pingtidsgränsen."
+ 
+ #. type: Content of: <reference><refentry><refsect1><para><variablelist><varlistentry><listitem><para>
+ #: sssd.conf.5.xml:3437 sssd.conf.5.xml:3457 sssd.conf.5.xml:3476
+@@ -15938,7 +15945,7 @@ msgstr ""
+ #. type: Content of: <reference><refentry><refsect1><refsect2><title>
+ #: sssd-ifp.5.xml:43
+ msgid "FIND BY VALID CERTIFICATE"
+-msgstr ""
++msgstr "HITTA MED GILTIGT CERTIFIKAT"
+ 
+ #. type: Content of: <reference><refentry><refsect1><refsect2><para>
+ #: sssd-ifp.5.xml:45
+@@ -15946,6 +15953,8 @@ msgid ""
+ "The following options can be used to control how the certificates are "
+ "validated when using the FindByValidCertificate() API:"
+ msgstr ""
++"Följande alternativ kan användas för att styra hur certifikat valideras när "
++"API:et FindByValidCertificate() används:"
+ 
+ #. type: Content of: <reference><refentry><refsect1><refsect2><para><itemizedlist><listitem><para>
+ #: sssd-ifp.5.xml:48 sss_ssh_authorizedkeys.1.xml:92
+@@ -15964,16 +15973,12 @@ msgstr "certificate_verification"
+ 
+ #. type: Content of: <reference><refentry><refsect1><refsect2><para>
+ #: sssd-ifp.5.xml:52
+-#, fuzzy
+-#| msgid ""
+-#| "For more details, see the <citerefentry> <refentrytitle>sssd.conf</"
+-#| "refentrytitle> <manvolnum>5</manvolnum> </citerefentry> manual page."
+ msgid ""
+ "For more details about the options see <citerefentry><refentrytitle>sssd."
+ "conf</refentrytitle> <manvolnum>5</manvolnum></citerefentry>."
+ msgstr ""
+-"För fler detaljer, se manualsidan <citerefentry> <refentrytitle>sssd.conf</"
+-"refentrytitle> <manvolnum>5</manvolnum> </citerefentry>."
++"För fler detaljer om alternativet, se <citerefentry><refentrytitle>sssd."
++"conf</refentrytitle> <manvolnum>5</manvolnum></citerefentry>."
+ 
+ #. type: Content of: <reference><refentry><refsect1><para>
+ #: sssd-ifp.5.xml:62
+@@ -20750,45 +20755,6 @@ msgstr ""
+ 
+ #. type: Content of: <refsect1><para>
+ #: include/seealso.xml:4
+-#, fuzzy
+-#| msgid ""
+-#| "<citerefentry> <refentrytitle>sssd</refentrytitle><manvolnum>8</"
+-#| "manvolnum> </citerefentry>, <citerefentry> <refentrytitle>sssd.conf</"
+-#| "refentrytitle><manvolnum>5</manvolnum> </citerefentry>, <citerefentry> "
+-#| "<refentrytitle>sssd-ldap</refentrytitle><manvolnum>5</manvolnum> </"
+-#| "citerefentry>, <citerefentry> <refentrytitle>sssd-krb5</"
+-#| "refentrytitle><manvolnum>5</manvolnum> </citerefentry>, <citerefentry> "
+-#| "<refentrytitle>sssd-simple</refentrytitle><manvolnum>5</manvolnum> </"
+-#| "citerefentry>, <citerefentry> <refentrytitle>sssd-ipa</"
+-#| "refentrytitle><manvolnum>5</manvolnum> </citerefentry>, <citerefentry> "
+-#| "<refentrytitle>sssd-ad</refentrytitle><manvolnum>5</manvolnum> </"
+-#| "citerefentry>, <citerefentry> <refentrytitle>sssd-files</"
+-#| "refentrytitle><manvolnum>5</manvolnum> </citerefentry>, <phrase condition="
+-#| "\"with_sudo\"> <citerefentry> <refentrytitle>sssd-sudo</refentrytitle> "
+-#| "<manvolnum>5</manvolnum> </citerefentry>, </phrase> <phrase condition="
+-#| "\"with_secrets\"> <citerefentry> <refentrytitle>sssd-secrets</"
+-#| "refentrytitle> <manvolnum>5</manvolnum> </citerefentry>, </phrase> "
+-#| "<citerefentry> <refentrytitle>sssd-session-recording</refentrytitle> "
+-#| "<manvolnum>5</manvolnum> </citerefentry>, <citerefentry> "
+-#| "<refentrytitle>sss_cache</refentrytitle><manvolnum>8</manvolnum> </"
+-#| "citerefentry>, <citerefentry> <refentrytitle>sss_debuglevel</"
+-#| "refentrytitle><manvolnum>8</manvolnum> </citerefentry>, <citerefentry> "
+-#| "<refentrytitle>sss_obfuscate</refentrytitle><manvolnum>8</manvolnum> </"
+-#| "citerefentry>, <citerefentry> <refentrytitle>sss_seed</"
+-#| "refentrytitle><manvolnum>8</manvolnum> </citerefentry>, <citerefentry> "
+-#| "<refentrytitle>sssd_krb5_locator_plugin</refentrytitle><manvolnum>8</"
+-#| "manvolnum> </citerefentry>, <phrase condition=\"with_ssh\"> "
+-#| "<citerefentry> <refentrytitle>sss_ssh_authorizedkeys</refentrytitle> "
+-#| "<manvolnum>8</manvolnum> </citerefentry>, <citerefentry> "
+-#| "<refentrytitle>sss_ssh_knownhostsproxy</refentrytitle> <manvolnum>8</"
+-#| "manvolnum> </citerefentry>, </phrase> <phrase condition=\"with_ifp\"> "
+-#| "<citerefentry> <refentrytitle>sssd-ifp</refentrytitle> <manvolnum>5</"
+-#| "manvolnum> </citerefentry>, </phrase> <citerefentry> "
+-#| "<refentrytitle>pam_sss</refentrytitle><manvolnum>8</manvolnum> </"
+-#| "citerefentry>.  <citerefentry> <refentrytitle>sss_rpcidmapd</"
+-#| "refentrytitle> <manvolnum>5</manvolnum> </citerefentry> <phrase condition="
+-#| "\"with_stap\"> <citerefentry> <refentrytitle>sssd-systemtap</"
+-#| "refentrytitle> <manvolnum>5</manvolnum> </citerefentry> </phrase>"
+ msgid ""
+ "<citerefentry> <refentrytitle>sssd</refentrytitle><manvolnum>8</manvolnum> </"
+ "citerefentry>, <citerefentry> <refentrytitle>sssd.conf</"
+@@ -20826,41 +20792,42 @@ msgid ""
+ "citerefentry> </phrase>"
+ msgstr ""
+ "<citerefentry> <refentrytitle>sssd</refentrytitle><manvolnum>8</manvolnum> </"
+-"citerefentry>, <citerefentry> <refentrytitle>sssd.conf</"
+-"refentrytitle><manvolnum>5</manvolnum> </citerefentry>, <citerefentry> "
++"citerefentry>, <citerefentry> <refentrytitle>sssd."
++"conf</refentrytitle><manvolnum>5</manvolnum> </citerefentry>, <citerefentry> "
+ "<refentrytitle>sssd-ldap</refentrytitle><manvolnum>5</manvolnum> </"
+-"citerefentry>, <citerefentry> <refentrytitle>sssd-krb5</"
+-"refentrytitle><manvolnum>5</manvolnum> </citerefentry>, <citerefentry> "
++"citerefentry>, <citerefentry> <refentrytitle>sssd-"
++"krb5</refentrytitle><manvolnum>5</manvolnum> </citerefentry>, <citerefentry> "
+ "<refentrytitle>sssd-simple</refentrytitle><manvolnum>5</manvolnum> </"
+-"citerefentry>, <citerefentry> <refentrytitle>sssd-ipa</"
+-"refentrytitle><manvolnum>5</manvolnum> </citerefentry>, <citerefentry> "
++"citerefentry>, <citerefentry> <refentrytitle>sssd-"
++"ipa</refentrytitle><manvolnum>5</manvolnum> </citerefentry>, <citerefentry> "
+ "<refentrytitle>sssd-ad</refentrytitle><manvolnum>5</manvolnum> </"
+-"citerefentry>, <citerefentry> <refentrytitle>sssd-files</"
+-"refentrytitle><manvolnum>5</manvolnum> </citerefentry>, <phrase condition="
+-"\"with_sudo\"> <citerefentry> <refentrytitle>sssd-sudo</refentrytitle> "
+-"<manvolnum>5</manvolnum> </citerefentry>, </phrase> <phrase condition="
+-"\"with_secrets\"> <citerefentry> <refentrytitle>sssd-secrets</refentrytitle> "
+-"<manvolnum>5</manvolnum> </citerefentry>, </phrase> <citerefentry> "
+-"<refentrytitle>sssd-session-recording</refentrytitle> <manvolnum>5</"
+-"manvolnum> </citerefentry>, <citerefentry> <refentrytitle>sss_cache</"
+-"refentrytitle><manvolnum>8</manvolnum> </citerefentry>, <citerefentry> "
++"citerefentry>, <citerefentry> <refentrytitle>sssd-"
++"files</refentrytitle><manvolnum>5</manvolnum> </citerefentry>, <phrase "
++"condition=\"with_sudo\"> <citerefentry> <refentrytitle>sssd-sudo</"
++"refentrytitle> <manvolnum>5</manvolnum> </citerefentry>, </phrase> "
++"<citerefentry> <refentrytitle>sssd-session-recording</refentrytitle> "
++"<manvolnum>5</manvolnum> </citerefentry>, <citerefentry> "
++"<refentrytitle>sss_cache</refentrytitle><manvolnum>8</manvolnum> </"
++"citerefentry>, <citerefentry> "
+ "<refentrytitle>sss_debuglevel</refentrytitle><manvolnum>8</manvolnum> </"
+-"citerefentry>, <citerefentry> <refentrytitle>sss_obfuscate</"
+-"refentrytitle><manvolnum>8</manvolnum> </citerefentry>, <citerefentry> "
++"citerefentry>, <citerefentry> "
++"<refentrytitle>sss_obfuscate</refentrytitle><manvolnum>8</manvolnum> </"
++"citerefentry>, <citerefentry> "
+ "<refentrytitle>sss_seed</refentrytitle><manvolnum>8</manvolnum> </"
+-"citerefentry>, <citerefentry> <refentrytitle>sssd_krb5_locator_plugin</"
+-"refentrytitle><manvolnum>8</manvolnum> </citerefentry>, <phrase condition="
+-"\"with_ssh\"> <citerefentry> <refentrytitle>sss_ssh_authorizedkeys</"
+-"refentrytitle> <manvolnum>8</manvolnum> </citerefentry>, <citerefentry> "
++"citerefentry>, <citerefentry> "
++"<refentrytitle>sssd_krb5_locator_plugin</refentrytitle><manvolnum>8</"
++"manvolnum> </citerefentry>, <phrase condition=\"with_ssh\"> <citerefentry> "
++"<refentrytitle>sss_ssh_authorizedkeys</refentrytitle> <manvolnum>8</"
++"manvolnum> </citerefentry>, <citerefentry> "
+ "<refentrytitle>sss_ssh_knownhostsproxy</refentrytitle> <manvolnum>8</"
+ "manvolnum> </citerefentry>, </phrase> <phrase condition=\"with_ifp\"> "
+ "<citerefentry> <refentrytitle>sssd-ifp</refentrytitle> <manvolnum>5</"
+-"manvolnum> </citerefentry>, </phrase> <citerefentry> <refentrytitle>pam_sss</"
+-"refentrytitle><manvolnum>8</manvolnum> </citerefentry>.  <citerefentry> "
+-"<refentrytitle>sss_rpcidmapd</refentrytitle> <manvolnum>5</manvolnum> </"
+-"citerefentry> <phrase condition=\"with_stap\"> <citerefentry> "
+-"<refentrytitle>sssd-systemtap</refentrytitle> <manvolnum>5</manvolnum> </"
+-"citerefentry> </phrase>"
++"manvolnum> </citerefentry>, </phrase> <citerefentry> "
++"<refentrytitle>pam_sss</refentrytitle><manvolnum>8</manvolnum> </"
++"citerefentry>.  <citerefentry> <refentrytitle>sss_rpcidmapd</refentrytitle> "
++"<manvolnum>5</manvolnum> </citerefentry> <phrase condition=\"with_stap\"> "
++"<citerefentry> <refentrytitle>sssd-systemtap</refentrytitle> <manvolnum>5</"
++"manvolnum> </citerefentry> </phrase>"
+ 
+ #. type: Content of: <listitem><para>
+ #: include/ldap_search_bases.xml:3
+diff --git a/src/man/po/uk.po b/src/man/po/uk.po
+index dd08f055e..e6477148e 100644
+--- a/src/man/po/uk.po
++++ b/src/man/po/uk.po
+@@ -16,7 +16,7 @@ msgstr ""
+ "Project-Id-Version: sssd-docs 2.3.0\n"
+ "Report-Msgid-Bugs-To: sssd-devel@redhat.com\n"
+ "POT-Creation-Date: 2021-12-20 16:05+0100\n"
+-"PO-Revision-Date: 2021-10-20 03:21+0000\n"
++"PO-Revision-Date: 2021-12-22 10:38+0000\n"
+ "Last-Translator: Yuri Chornoivan <yurchor@ukr.net>\n"
+ "Language-Team: Ukrainian <https://translate.fedoraproject.org/projects/sssd/"
+ "sssd-manpage-master/uk/>\n"
+@@ -26,7 +26,7 @@ msgstr ""
+ "Content-Transfer-Encoding: 8bit\n"
+ "Plural-Forms: nplurals=3; plural=n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
+ "%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2;\n"
+-"X-Generator: Weblate 4.8\n"
++"X-Generator: Weblate 4.10\n"
+ 
+ #. type: Content of: <reference><title>
+ #: sssd.conf.5.xml:5 sssd-ldap.5.xml:5 pam_sss.8.xml:5 pam_sss_gss.8.xml:5
+@@ -703,6 +703,9 @@ msgid ""
+ "e. accessible via <quote>files</quote> service of <filename>nsswitch.conf</"
+ "filename>."
+ msgstr ""
++"Можна скористатися іменем користувача і UID, але користувач має бути "
++"локальним, тобто доступним для служби <quote>files</quote> <filename>nsswitch"
++".conf</filename>."
+ 
+ #. type: Content of: <reference><refentry><refsect1><refsect2><para><variablelist><varlistentry><listitem><para>
+ #: sssd.conf.5.xml:433
+@@ -3255,6 +3258,8 @@ msgid ""
+ "Local user names are required, i.e. accessible via <quote>files</quote> "
+ "service of <filename>nsswitch.conf</filename>."
+ msgstr ""
++"Потрібні локальні імена користувачів, тобто імена, які доступні зі служби "
++"<quote>files</quote> <filename>nsswitch.conf</filename>."
+ 
+ #. type: Content of: <reference><refentry><refsect1><refsect2><variablelist><varlistentry><listitem><para>
+ #: sssd.conf.5.xml:2177
+@@ -4915,6 +4920,8 @@ msgstr ""
+ msgid ""
+ "The AD provider will use this option for the CLDAP ping timeouts as well."
+ msgstr ""
++"Надавач даних AD використовуватиме цей параметр також для визначення часу "
++"очікування на відгук на луна-імпульс CLDAP."
+ 
+ #. type: Content of: <reference><refentry><refsect1><para><variablelist><varlistentry><listitem><para>
+ #: sssd.conf.5.xml:3437 sssd.conf.5.xml:3457 sssd.conf.5.xml:3476
+@@ -16286,7 +16293,7 @@ msgstr ""
+ #. type: Content of: <reference><refentry><refsect1><refsect2><title>
+ #: sssd-ifp.5.xml:43
+ msgid "FIND BY VALID CERTIFICATE"
+-msgstr ""
++msgstr "ПОШУК ЗА ЧИННИМ СЕРТИФІКАТОМ"
+ 
+ #. type: Content of: <reference><refentry><refsect1><refsect2><para>
+ #: sssd-ifp.5.xml:45
+@@ -16294,6 +16301,8 @@ msgid ""
+ "The following options can be used to control how the certificates are "
+ "validated when using the FindByValidCertificate() API:"
+ msgstr ""
++"Для керування тим, як буде виконуватися перевірка, якщо використано "
++"програмний інтерфейс FindByValidCertificate(), використовують такі параметри:"
+ 
+ #. type: Content of: <reference><refentry><refsect1><refsect2><para><itemizedlist><listitem><para>
+ #: sssd-ifp.5.xml:48 sss_ssh_authorizedkeys.1.xml:92
+@@ -16312,15 +16321,11 @@ msgstr "certificate_verification"
+ 
+ #. type: Content of: <reference><refentry><refsect1><refsect2><para>
+ #: sssd-ifp.5.xml:52
+-#, fuzzy
+-#| msgid ""
+-#| "For more details, see the <citerefentry> <refentrytitle>sssd.conf</"
+-#| "refentrytitle> <manvolnum>5</manvolnum> </citerefentry> manual page."
+ msgid ""
+ "For more details about the options see <citerefentry><refentrytitle>sssd."
+ "conf</refentrytitle> <manvolnum>5</manvolnum></citerefentry>."
+ msgstr ""
+-"Щоб дізнатися більше, ознайомтеся зі сторінкою підручника щодо "
++"Щоб дізнатися більше про параметри, ознайомтеся зі сторінкою підручника щодо "
+ "<citerefentry> <refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</"
+ "manvolnum> </citerefentry>."
+ 
+-- 
+2.26.3
+

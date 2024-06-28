@@ -1,0 +1,432 @@
+From 37f90057792a0b4543f34684ed9a240fe8e869c1 Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Mon, 11 Apr 2022 22:48:19 +0200
+Subject: [PATCH 5/6] Revert "usertools: force local user for sssd process
+ user"
+
+This reverts commit 9c447dc85853116c035bbc2f9e3b8553a65be621.
+
+Resolves: https://github.com/SSSD/sssd/issues/6107
+
+Reviewed-by: Iker Pedrosa <ipedrosa@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+---
+ Makefile.am                               |  3 -
+ src/tests/cwrap/Makefile.am               |  8 +--
+ src/tests/cwrap/common_mock_nss_dl_load.c | 77 -----------------------
+ src/tests/cwrap/common_mock_nss_dl_load.h | 30 ---------
+ src/tests/cwrap/test_responder_common.c   |  7 ---
+ src/tests/cwrap/test_usertools.c          |  6 --
+ src/util/nss_dl_load.c                    | 13 +---
+ src/util/nss_dl_load.h                    |  3 -
+ src/util/nss_dl_load_extra.c              | 40 ------------
+ src/util/usertools.c                      | 32 +++-------
+ 10 files changed, 12 insertions(+), 207 deletions(-)
+ delete mode 100644 src/tests/cwrap/common_mock_nss_dl_load.c
+ delete mode 100644 src/tests/cwrap/common_mock_nss_dl_load.h
+ delete mode 100644 src/util/nss_dl_load_extra.c
+
+diff --git a/Makefile.am b/Makefile.am
+index 1121a3fb2..e0dd5220c 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -888,7 +888,6 @@ dist_noinst_HEADERS = \
+     src/tests/cmocka/test_expire_common.h \
+     src/tests/cmocka/test_sdap_access.h \
+     src/tests/cmocka/data_provider/mock_dp.h \
+-    src/tests/cwrap/common_mock_nss_dl_load.h \
+     src/sss_client/pam_message.h \
+     src/sss_client/ssh/sss_ssh_client.h \
+     src/sss_client/sudo/sss_sudo.h \
+@@ -1271,8 +1270,6 @@ libsss_util_la_SOURCES = \
+     src/util/sss_regexp.c \
+     src/util/sss_chain_id_tevent.c \
+     src/util/sss_chain_id.c \
+-    src/util/nss_dl_load.c \
+-    src/util/nss_dl_load_extra.c \
+     $(NULL)
+ libsss_util_la_CFLAGS = \
+     $(AM_CFLAGS) \
+diff --git a/src/tests/cwrap/Makefile.am b/src/tests/cwrap/Makefile.am
+index 4ac24a492..f25d2e3c6 100644
+--- a/src/tests/cwrap/Makefile.am
++++ b/src/tests/cwrap/Makefile.am
+@@ -142,17 +142,15 @@ endif
+ 
+ usertools_tests_SOURCES = \
+     test_usertools.c \
+-    common_mock_nss_dl_load.c \
+-    ../../../src/util/usertools.c \
+     $(NULL)
+ usertools_tests_CFLAGS = \
+     $(AM_CFLAGS) \
+     $(NULL)
+ usertools_tests_LDADD = \
+-    $(LIBADD_DL) \
+     $(CMOCKA_LIBS) \
+     $(POPT_LIBS) \
+     $(TALLOC_LIBS) \
++    $(abs_top_builddir)/libsss_util.la \
+     $(abs_top_builddir)/libsss_debug.la \
+     $(abs_top_builddir)/libsss_test_common.la \
+     $(NULL)
+@@ -162,10 +160,9 @@ endif
+ 
+ responder_common_tests_SOURCES =\
+     test_responder_common.c \
+-    common_mock_nss_dl_load.c \
+     $(SSSD_RESPONDER_IFACE_OBJ) \
+     ../../../src/responder/common/negcache_files.c \
+-    ../../../src/util/usertools.c \
++    ../../../src/util/nss_dl_load.c \
+     ../../../src/responder/common/negcache.c \
+     ../../../src/responder/common/responder_common.c \
+     ../../../src/responder/common/responder_packet.c \
+@@ -183,6 +180,7 @@ responder_common_tests_LDADD = \
+     $(SSSD_LIBS) \
+     $(SELINUX_LIBS) \
+     $(SYSTEMD_DAEMON_LIBS) \
++    $(abs_top_builddir)/libsss_util.la \
+     $(abs_top_builddir)/libsss_debug.la \
+     $(abs_top_builddir)/libsss_test_common.la \
+     $(abs_top_builddir)/libsss_iface.la \
+diff --git a/src/tests/cwrap/common_mock_nss_dl_load.c b/src/tests/cwrap/common_mock_nss_dl_load.c
+deleted file mode 100644
+index 72f6c39ac..000000000
+--- a/src/tests/cwrap/common_mock_nss_dl_load.c
++++ /dev/null
+@@ -1,77 +0,0 @@
+-/*
+-    Authors:
+-        Iker Pedrosa <ipedrosa@redhat.com>
+-
+-    Copyright (C) 2021 Red Hat
+-
+-    SSSD tests: Fake nss dl load
+-
+-    This program is free software; you can redistribute it and/or modify
+-    it under the terms of the GNU General Public License as published by
+-    the Free Software Foundation; either version 3 of the License, or
+-    (at your option) any later version.
+-
+-    This program is distributed in the hope that it will be useful,
+-    but WITHOUT ANY WARRANTY; without even the implied warranty of
+-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-    GNU General Public License for more details.
+-
+-    You should have received a copy of the GNU General Public License
+-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-*/
+-
+-#include <sys/types.h>
+-#include <sys/stat.h>
+-#include <errno.h>
+-#include <stddef.h>
+-
+-#include "common_mock_nss_dl_load.h"
+-
+-
+-static enum nss_status
+-mock_getpwnam_r(const char *name, struct passwd *result,
+-                char *buffer, size_t buflen, int *errnop)
+-{
+-    void *pwd_pointer = NULL;
+-    int rc;
+-
+-    rc = getpwnam_r(name, result, buffer, buflen, (struct passwd **)&pwd_pointer);
+-    if (rc == 0 && pwd_pointer == result) {
+-        *errnop = 0;
+-        return NSS_STATUS_SUCCESS;
+-    } else if (rc == 0 && (pwd_pointer == NULL)) {
+-        *errnop = ENOENT;
+-        return NSS_STATUS_NOTFOUND;
+-    } else {
+-        *errnop = rc;
+-        return NSS_STATUS_UNAVAIL;
+-    }
+-}
+-
+-static enum nss_status
+-mock_getpwuid_r(uid_t uid, struct passwd *result,
+-                char *buffer, size_t buflen, int *errnop)
+-{
+-    void *pwd_pointer = NULL;
+-    int rc;
+-
+-    rc = getpwuid_r(uid, result, buffer, buflen, (struct passwd **)&pwd_pointer);
+-    if (rc == 0 && pwd_pointer == result) {
+-        *errnop = 0;
+-        return NSS_STATUS_SUCCESS;
+-    } else if (rc == 0 && (pwd_pointer == NULL)) {
+-        *errnop = ENOENT;
+-        return NSS_STATUS_NOTFOUND;
+-    } else {
+-        *errnop = rc;
+-        return NSS_STATUS_UNAVAIL;
+-    }
+-}
+-
+-errno_t mock_sss_load_nss_pw_symbols(struct sss_nss_ops *ops)
+-{
+-    ops->getpwnam_r = mock_getpwnam_r;
+-    ops->getpwuid_r = mock_getpwuid_r;
+-
+-    return EOK;
+-}
+diff --git a/src/tests/cwrap/common_mock_nss_dl_load.h b/src/tests/cwrap/common_mock_nss_dl_load.h
+deleted file mode 100644
+index 6db411450..000000000
+--- a/src/tests/cwrap/common_mock_nss_dl_load.h
++++ /dev/null
+@@ -1,30 +0,0 @@
+-/*
+-    Authors:
+-        Iker Pedrosa <ipedrosa@redhat.com>
+-
+-    Copyright (C) 2021 Red Hat
+-
+-    SSSD tests: Fake nss dl load
+-
+-    This program is free software; you can redistribute it and/or modify
+-    it under the terms of the GNU General Public License as published by
+-    the Free Software Foundation; either version 3 of the License, or
+-    (at your option) any later version.
+-
+-    This program is distributed in the hope that it will be useful,
+-    but WITHOUT ANY WARRANTY; without even the implied warranty of
+-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-    GNU General Public License for more details.
+-
+-    You should have received a copy of the GNU General Public License
+-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-*/
+-
+-#ifndef __COMMON_MOCK_NSS_DL_LOAD_H_
+-#define __COMMON_MOCK_NSS_DL_LOAD_H_
+-
+-#include "util/nss_dl_load.h"
+-
+-errno_t mock_sss_load_nss_pw_symbols(struct sss_nss_ops *ops);
+-
+-#endif /* __COMMON_MOCK_NSS_DL_LOAD_H_ */
+diff --git a/src/tests/cwrap/test_responder_common.c b/src/tests/cwrap/test_responder_common.c
+index 571e95d36..11cc3abd8 100644
+--- a/src/tests/cwrap/test_responder_common.c
++++ b/src/tests/cwrap/test_responder_common.c
+@@ -29,13 +29,6 @@
+ #include "util/util.h"
+ #include "responder/common/responder.h"
+ #include "tests/cmocka/common_mock.h"
+-#include "tests/cwrap/common_mock_nss_dl_load.h"
+-
+-
+-errno_t sss_load_nss_pw_symbols(struct sss_nss_ops *ops)
+-{
+-    return mock_sss_load_nss_pw_symbols(ops);
+-}
+ 
+ /* Just to satisfy dependencies */
+ struct cli_protocol_version *register_cli_protocol_version(void)
+diff --git a/src/tests/cwrap/test_usertools.c b/src/tests/cwrap/test_usertools.c
+index eb30a540c..f61ae83e2 100644
+--- a/src/tests/cwrap/test_usertools.c
++++ b/src/tests/cwrap/test_usertools.c
+@@ -27,12 +27,6 @@
+ #include <popt.h>
+ #include "util/util.h"
+ #include "tests/cmocka/common_mock.h"
+-#include "tests/cwrap/common_mock_nss_dl_load.h"
+-
+-errno_t sss_load_nss_pw_symbols(struct sss_nss_ops *ops)
+-{
+-    return mock_sss_load_nss_pw_symbols(ops);
+-}
+ 
+ void test_get_user_num(void **state)
+ {
+diff --git a/src/util/nss_dl_load.c b/src/util/nss_dl_load.c
+index 379ccfa65..442108307 100644
+--- a/src/util/nss_dl_load.c
++++ b/src/util/nss_dl_load.c
+@@ -48,16 +48,6 @@ static void *proxy_dlsym(void *handle,
+     return funcptr;
+ }
+ 
+-static void sss_close_handle(struct sss_nss_ops *ops, const char *libname)
+-{
+-    if (dlclose(ops->dl_handle) != 0) {
+-        DEBUG(SSSDBG_OP_FAILURE,
+-              "Error closing the handle for the '%s' library, error: %s.\n",
+-              libname, dlerror());
+-    }
+-
+-    ops->dl_handle = NULL;
+-}
+ 
+ errno_t sss_load_nss_symbols(struct sss_nss_ops *ops, const char *libname,
+                              struct sss_nss_symbols *syms, size_t nsyms)
+@@ -82,7 +72,7 @@ errno_t sss_load_nss_symbols(struct sss_nss_ops *ops, const char *libname,
+ 
+     for (i = 0; i < nsyms; i++) {
+         *(syms[i].fptr) = proxy_dlsym(ops->dl_handle, syms[i].fname,
+-                                      libname);
++                                     libname);
+ 
+         if (*(syms[i].fptr) == NULL) {
+             if (syms[i].mandatory) {
+@@ -90,7 +80,6 @@ errno_t sss_load_nss_symbols(struct sss_nss_ops *ops, const char *libname,
+                       "mandatory symbol '%s', error: %s.\n", libpath,
+                       syms[i].fname, dlerror());
+                 ret = ELIBBAD;
+-                sss_close_handle(ops, libname);
+                 goto out;
+             } else {
+                 DEBUG(SSSDBG_OP_FAILURE, "Library '%s' did not provide "
+diff --git a/src/util/nss_dl_load.h b/src/util/nss_dl_load.h
+index 07c04e091..f1e882b96 100644
+--- a/src/util/nss_dl_load.h
++++ b/src/util/nss_dl_load.h
+@@ -23,8 +23,6 @@
+ #include <pwd.h>
+ #include <grp.h>
+ #include <netdb.h>
+-#include <stdbool.h>
+-
+ #include "util/util_errors.h"
+ #include "sss_client/nss_compat.h"
+ 
+@@ -120,6 +118,5 @@ struct sss_nss_symbols {
+ errno_t sss_load_nss_symbols(struct sss_nss_ops *ops, const char *libname,
+                              struct sss_nss_symbols *syms, size_t nsyms);
+ 
+-errno_t sss_load_nss_pw_symbols(struct sss_nss_ops *ops);
+ 
+ #endif /* __SSSD_NSS_DL_LOAD_H__ */
+diff --git a/src/util/nss_dl_load_extra.c b/src/util/nss_dl_load_extra.c
+deleted file mode 100644
+index 162957025..000000000
+--- a/src/util/nss_dl_load_extra.c
++++ /dev/null
+@@ -1,40 +0,0 @@
+-/*
+-    SSSD
+-
+-    nss_dl_load_extra.c
+-
+-    Authors:
+-        Sumit Bose <sbose@redhat.com>
+-        Iker Pedrosa <ipedrosa@redhat.com>
+-
+-    Copyright (C) 2021 Red Hat
+-
+-    This program is free software; you can redistribute it and/or modify
+-    it under the terms of the GNU General Public License as published by
+-    the Free Software Foundation; either version 3 of the License, or
+-    (at your option) any later version.
+-
+-    This program is distributed in the hope that it will be useful,
+-    but WITHOUT ANY WARRANTY; without even the implied warranty of
+-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-    GNU General Public License for more details.
+-
+-    You should have received a copy of the GNU General Public License
+-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-*/
+-
+-#include "util/nss_dl_load.h"
+-
+-errno_t sss_load_nss_pw_symbols(struct sss_nss_ops *ops)
+-{
+-    errno_t ret;
+-    struct sss_nss_symbols syms[] = {
+-        {(void*)&ops->getpwnam_r, true, "getpwnam_r" },
+-        {(void*)&ops->getpwuid_r, true, "getpwuid_r" }
+-    };
+-    size_t nsyms = sizeof(syms) / sizeof(struct sss_nss_symbols);
+-
+-    ret = sss_load_nss_symbols(ops, "files", syms, nsyms);
+-
+-    return ret;
+-}
+diff --git a/src/util/usertools.c b/src/util/usertools.c
+index 33315a798..511fb2d5d 100644
+--- a/src/util/usertools.c
++++ b/src/util/usertools.c
+@@ -27,14 +27,12 @@
+ 
+ #include "db/sysdb.h"
+ #include "confdb/confdb.h"
+-#include "util/nss_dl_load.h"
+ #include "util/strtonum.h"
+ #include "util/util.h"
+ #include "util/safe-format-string.h"
+ #include "responder/common/responder.h"
+ 
+ #define NAME_DOMAIN_PATTERN_OPTIONS (SSS_REGEXP_DUPNAMES | SSS_REGEXP_EXTENDED)
+-#define NSS_BUFFER_SIZE 16384
+ 
+ /* Function returns given realm name as new uppercase string */
+ char *get_uppercase_realm(TALLOC_CTX *memctx, const char *name)
+@@ -568,23 +566,10 @@ sss_fqname(char *str, size_t size, struct sss_names_ctx *nctx,
+ 
+ errno_t sss_user_by_name_or_uid(const char *input, uid_t *_uid, gid_t *_gid)
+ {
+-    static struct sss_nss_ops nss_ops;
+     uid_t uid;
+     errno_t ret;
+     char *endptr;
+-    struct passwd pwd = { 0 };
+-    int errnop = 0;
+-    enum nss_status status;
+-    static char s_nss_buffer[NSS_BUFFER_SIZE];
+-
+-    if (!nss_ops.dl_handle) {
+-        ret = sss_load_nss_pw_symbols(&nss_ops);
+-        if (ret != EOK) {
+-            DEBUG(SSSDBG_OP_FAILURE, "Unable to load NSS symbols [%d]: %s\n",
+-                  ret, sss_strerror(ret));
+-            return ret;
+-        }
+-    }
++    struct passwd *pwd;
+ 
+     /* Try if it's an ID first */
+     uid = strtouint32(input, &endptr, 10);
+@@ -596,27 +581,26 @@ errno_t sss_user_by_name_or_uid(const char *input, uid_t *_uid, gid_t *_gid)
+             return ret;
+         }
+ 
+-        status = nss_ops.getpwnam_r(input, &pwd, s_nss_buffer, NSS_BUFFER_SIZE, &errnop);
++        /* Nope, maybe a username? */
++        pwd = getpwnam(input);
+     } else {
+-        status = nss_ops.getpwuid_r(uid, &pwd, s_nss_buffer, NSS_BUFFER_SIZE, &errnop);
++        pwd = getpwuid(uid);
+     }
+ 
+-    if (status != NSS_STATUS_SUCCESS) {
++    if (pwd == NULL) {
+         DEBUG(SSSDBG_OP_FAILURE,
+               "[%s] is neither a valid UID nor a user name which could be "
+-              "resolved by getpwnam() [%d][%s]. status returned [%d]\n",
+-              input, errnop, strerror(errnop), status);
++              "resolved by getpwnam().\n", input);
+         return EINVAL;
+     }
+ 
+     if (_uid) {
+-        *_uid = pwd.pw_uid;
++        *_uid = pwd->pw_uid;
+     }
+ 
+     if (_gid) {
+-        *_gid = pwd.pw_gid;
++        *_gid = pwd->pw_gid;
+     }
+-
+     return EOK;
+ }
+ 
+-- 
+2.26.3
+

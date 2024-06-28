@@ -1,0 +1,36 @@
+From 31e57432537b9d248839159d83cfa9049faf192b Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Fri, 19 Jun 2020 13:32:30 +0200
+Subject: [PATCH] pam_sss: make sure old certificate data is removed before
+ retry
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+To avoid that certificates will be shown in the certificate selection
+which are not available anymore they must be remove before a new request
+to look up the certificates is send to SSSD's PAM responder.
+
+Resolves: https://github.com/SSSD/sssd/issues/5190
+
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+---
+ src/sss_client/pam_sss.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/sss_client/pam_sss.c b/src/sss_client/pam_sss.c
+index e3ad2c9b2..6a3ba2f50 100644
+--- a/src/sss_client/pam_sss.c
++++ b/src/sss_client/pam_sss.c
+@@ -2467,6 +2467,8 @@ static int check_login_token_name(pam_handle_t *pamh, struct pam_items *pi,
+                         && strcmp(login_token_name,
+                                   pi->cert_list->token_name) != 0)) {
+ 
++        free_cert_list(pi->cert_list);
++        pi->cert_list = NULL;
+         if (retries < 0) {
+             ret = PAM_AUTHINFO_UNAVAIL;
+             goto done;
+-- 
+2.21.3
+

@@ -1,0 +1,42 @@
+From bf6059eb55c8caa3111ef718db1676c96a67c084 Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Thu, 16 Dec 2021 11:14:18 +0100
+Subject: [PATCH] ad: add required 'cn' attribute to subdomain object
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+If the forest root is not part of the return trusted domain objects
+from the local domain controller we generate an object for further
+processing. During this processing it is expected that the 'cn'
+attribute is set and contains the name of the forest root. So far this
+attribute was missing and it is now added by this patch.
+
+Resolves: https://github.com/SSSD/sssd/issues/5926
+
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+---
+ src/providers/ad/ad_subdomains.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/src/providers/ad/ad_subdomains.c b/src/providers/ad/ad_subdomains.c
+index 0353de76f..0c3f8ac31 100644
+--- a/src/providers/ad/ad_subdomains.c
++++ b/src/providers/ad/ad_subdomains.c
+@@ -1646,6 +1646,13 @@ static void ad_check_root_domain_done(struct tevent_req *subreq)
+         goto done;
+     }
+ 
++    ret = sysdb_attrs_add_string(state->reply[0], AD_AT_DOMAIN_NAME,
++                                 state->forest);
++    if (ret != EOK) {
++        DEBUG(SSSDBG_OP_FAILURE, "sysdb_attrs_add_string() failed.\n");
++        goto done;
++    }
++
+     err = sss_idmap_sid_to_bin_sid(state->idmap_ctx->map, id,
+                                    &id_val.data, &id_val.length);
+     if (err != IDMAP_SUCCESS) {
+-- 
+2.26.3
+

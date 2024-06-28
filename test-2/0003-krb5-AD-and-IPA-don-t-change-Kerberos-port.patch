@@ -1,0 +1,140 @@
+From ca8cef0fc2f6066811105f4c201070cda38c4064 Mon Sep 17 00:00:00 2001
+From: Iker Pedrosa <ipedrosa@redhat.com>
+Date: Thu, 13 Jan 2022 11:28:30 +0100
+Subject: [PATCH] krb5: AD and IPA don't change Kerberos port
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+AD and IPA providers use a common fo_server object for LDAP and
+Kerberos, which is created with the LDAP data. This means that due to
+the changes introduced in
+https://github.com/SSSD/sssd/commit/1e747fad4539ffb402010e73f78469fe57af408f
+the port in use for the Kerberos requests would be the one specified for
+LDAP, usually the default one (389).
+
+In order to avoid that, AD and IPA providers shouldn't change the
+Kerberos port with the one provided for LDAP.
+
+:fixes: A critical regression that prevented authentication of users via
+AD and IPA providers was fixed. LDAP port was reused for Kerberos
+communication and this provider would send incomprehensible information
+to this port.
+
+Resolves: https://github.com/SSSD/sssd/issues/5947
+
+Signed-off-by: Iker Pedrosa <ipedrosa@redhat.com>
+
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+---
+ src/providers/ad/ad_common.c     |  1 +
+ src/providers/ipa/ipa_common.c   |  1 +
+ src/providers/krb5/krb5_common.c | 34 +++++++++++++++++++-------------
+ src/providers/krb5/krb5_common.h |  1 +
+ 4 files changed, 23 insertions(+), 14 deletions(-)
+
+diff --git a/src/providers/ad/ad_common.c b/src/providers/ad/ad_common.c
+index e263444c5..1ca5f8e3a 100644
+--- a/src/providers/ad/ad_common.c
++++ b/src/providers/ad/ad_common.c
+@@ -1087,6 +1087,7 @@ ad_resolve_callback(void *private_data, struct fo_server *server)
+     if (service->krb5_service->write_kdcinfo) {
+         ret = write_krb5info_file_from_fo_server(service->krb5_service,
+                                                  server,
++                                                 true,
+                                                  SSS_KRB5KDC_FO_SRV,
+                                                  ad_krb5info_file_filter);
+         if (ret != EOK) {
+diff --git a/src/providers/ipa/ipa_common.c b/src/providers/ipa/ipa_common.c
+index 1509cb1ce..e6c1f9aa4 100644
+--- a/src/providers/ipa/ipa_common.c
++++ b/src/providers/ipa/ipa_common.c
+@@ -925,6 +925,7 @@ static void ipa_resolve_callback(void *private_data, struct fo_server *server)
+     if (service->krb5_service->write_kdcinfo) {
+         ret = write_krb5info_file_from_fo_server(service->krb5_service,
+                                                  server,
++                                                 true,
+                                                  SSS_KRB5KDC_FO_SRV,
+                                                  NULL);
+         if (ret != EOK) {
+diff --git a/src/providers/krb5/krb5_common.c b/src/providers/krb5/krb5_common.c
+index 719ce6a12..5ffa20809 100644
+--- a/src/providers/krb5/krb5_common.c
++++ b/src/providers/krb5/krb5_common.c
+@@ -690,6 +690,7 @@ static const char* fo_server_address_or_name(TALLOC_CTX *tmp_ctx, struct fo_serv
+ 
+ errno_t write_krb5info_file_from_fo_server(struct krb5_service *krb5_service,
+                                            struct fo_server *server,
++                                           bool force_default_port,
+                                            const char *service,
+                                            bool (*filter)(struct fo_server *))
+ {
+@@ -731,13 +732,15 @@ errno_t write_krb5info_file_from_fo_server(struct krb5_service *krb5_service,
+     if (filter == NULL || filter(server) == false) {
+         address = fo_server_address_or_name(tmp_ctx, server);
+         if (address) {
+-            port = fo_get_server_port(server);
+-            if (port != 0) {
+-                address = talloc_asprintf(tmp_ctx, "%s:%d", address, port);
+-                if (address == NULL) {
+-                    DEBUG(SSSDBG_CRIT_FAILURE, "talloc_asprintf failed.\n");
+-                    talloc_free(tmp_ctx);
+-                    return ENOMEM;
++            if (!force_default_port) {
++                port = fo_get_server_port(server);
++                if (port != 0) {
++                    address = talloc_asprintf(tmp_ctx, "%s:%d", address, port);
++                    if (address == NULL) {
++                        DEBUG(SSSDBG_CRIT_FAILURE, "talloc_asprintf failed.\n");
++                        talloc_free(tmp_ctx);
++                        return ENOMEM;
++                    }
+                 }
+             }
+ 
+@@ -775,13 +778,15 @@ errno_t write_krb5info_file_from_fo_server(struct krb5_service *krb5_service,
+                 continue;
+             }
+ 
+-            port = fo_get_server_port(item);
+-            if (port != 0) {
+-                address = talloc_asprintf(tmp_ctx, "%s:%d", address, port);
+-                if (address == NULL) {
+-                    DEBUG(SSSDBG_CRIT_FAILURE, "talloc_asprintf failed.\n");
+-                    talloc_free(tmp_ctx);
+-                    return ENOMEM;
++            if (!force_default_port) {
++                port = fo_get_server_port(item);
++                if (port != 0) {
++                    address = talloc_asprintf(tmp_ctx, "%s:%d", address, port);
++                    if (address == NULL) {
++                        DEBUG(SSSDBG_CRIT_FAILURE, "talloc_asprintf failed.\n");
++                        talloc_free(tmp_ctx);
++                        return ENOMEM;
++                    }
+                 }
+             }
+ 
+@@ -821,6 +826,7 @@ static void krb5_resolve_callback(void *private_data, struct fo_server *server)
+     if (krb5_service->write_kdcinfo) {
+         ret = write_krb5info_file_from_fo_server(krb5_service,
+                                                  server,
++                                                 false,
+                                                  krb5_service->name,
+                                                  NULL);
+         if (ret != EOK) {
+diff --git a/src/providers/krb5/krb5_common.h b/src/providers/krb5/krb5_common.h
+index 151f446d1..2fd39a751 100644
+--- a/src/providers/krb5/krb5_common.h
++++ b/src/providers/krb5/krb5_common.h
+@@ -174,6 +174,7 @@ errno_t write_krb5info_file(struct krb5_service *krb5_service,
+ 
+ errno_t write_krb5info_file_from_fo_server(struct krb5_service *krb5_service,
+                                            struct fo_server *server,
++                                           bool force_default_port,
+                                            const char *service,
+                                            bool (*filter)(struct fo_server *));
+ 
+-- 
+2.26.3
+

@@ -1,0 +1,44 @@
+From abb146e1487598c0e4fa2cdc826b7388db46f9bc Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Wed, 20 Dec 2023 09:43:48 +0100
+Subject: [PATCH 9/9] SSS_CLIENT: check if reponder socket was hijacked
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Real life example would be:
+https://github.com/TigerVNC/tigervnc/blob/effd854bfd19654fa67ff3d39514a91a246b8ae6/unix/xserver/hw/vnc/xvnc.c#L369
+ - TigerVNC unconditionally overwrites fd=3
+
+Reviewed-by: Alejandro López <allopez@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+Reviewed-by: Tomáš Halman <thalman@redhat.com>
+(cherry picked from commit 2bcfb7f9238c27025e99e6445e9ba799e0bde7b8)
+---
+ src/sss_client/common.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/src/sss_client/common.c b/src/sss_client/common.c
+index 1075af941..702d0597d 100644
+--- a/src/sss_client/common.c
++++ b/src/sss_client/common.c
+@@ -746,6 +746,16 @@ static enum sss_status sss_cli_check_socket(int *errnop,
+         myself_ino = myself_sb.st_ino;
+     }
+ 
++    /* check if the socket has been hijacked */
++    if (sss_cli_sd != -1) {
++        ret = fstat(sss_cli_sd, &mypid_sb);
++        if ((ret != 0) || (!S_ISSOCK(mypid_sb.st_mode))
++            || (mypid_sb.st_dev != sss_cli_sb.st_dev)
++            || (mypid_sb.st_ino != sss_cli_sb.st_ino)) {
++            sss_cli_sd = -1;  /* don't ruin app even if it's misbehaving */
++        }
++    }
++
+     /* check if the socket has been closed on the other side */
+     if (sss_cli_sd_get() != -1) {
+         struct pollfd pfd;
+-- 
+2.41.0
+

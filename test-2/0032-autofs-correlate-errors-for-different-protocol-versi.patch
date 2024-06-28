@@ -1,0 +1,168 @@
+From 8a22d4ad45f5fc8e888be693539495093c2b3c35 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pavel=20B=C5=99ezina?= <pbrezina@redhat.com>
+Date: Wed, 4 Nov 2020 14:20:10 +0100
+Subject: [PATCH 17/18] autofs: correlate errors for different protocol
+ versions
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ src/sss_client/autofs/autofs_test_client.c | 12 ++++++++
+ src/sss_client/autofs/sss_autofs.c         | 35 +++++++++++++++++++---
+ src/sss_client/autofs/sss_autofs.exports   |  9 +++---
+ src/sss_client/autofs/sss_autofs_private.h |  5 ++++
+ 4 files changed, 53 insertions(+), 8 deletions(-)
+
+diff --git a/src/sss_client/autofs/autofs_test_client.c b/src/sss_client/autofs/autofs_test_client.c
+index c5358233f..4b285151e 100644
+--- a/src/sss_client/autofs/autofs_test_client.c
++++ b/src/sss_client/autofs/autofs_test_client.c
+@@ -45,10 +45,14 @@ int main(int argc, const char *argv[])
+     char *value = NULL;
+     char *pc_key = NULL;
+     int pc_setent = 0;
++    int pc_protocol = 1;
++    unsigned int protocol;
++    unsigned int requested_protocol = 1;
+     struct poptOption long_options[] = {
+         POPT_AUTOHELP
+         { "by-name",  'n', POPT_ARG_STRING, &pc_key, 0, "Request map by name", NULL },
+         { "only-setent",  's', POPT_ARG_VAL, &pc_setent, 1, "Run only setent, do not enumerate", NULL },
++        { "protocol",  'p', POPT_ARG_INT, &pc_protocol, 0, "Protocol version", NULL },
+         POPT_TABLEEND
+     };
+     poptContext pc = NULL;
+@@ -69,6 +73,14 @@ int main(int argc, const char *argv[])
+ 
+     poptFreeContext(pc);
+ 
++    requested_protocol = pc_protocol;
++    protocol = _sss_auto_protocol_version(requested_protocol);
++    if (protocol != requested_protocol) {
++        fprintf(stderr, "Unsupported protocol version: %d -> %d\n",
++                requested_protocol, protocol);
++        exit(EXIT_FAILURE);
++    }
++
+     ret = _sss_setautomntent(mapname, &ctx);
+     if (ret) {
+         fprintf(stderr, "setautomntent failed [%d]: %s\n",
+diff --git a/src/sss_client/autofs/sss_autofs.c b/src/sss_client/autofs/sss_autofs.c
+index 482ff2c40..ef27cf895 100644
+--- a/src/sss_client/autofs/sss_autofs.c
++++ b/src/sss_client/autofs/sss_autofs.c
+@@ -20,6 +20,7 @@
+ 
+ #include <errno.h>
+ #include <stdlib.h>
++#include <stdatomic.h>
+ 
+ #include "sss_client/autofs/sss_autofs_private.h"
+ #include "sss_client/sss_cli.h"
+@@ -33,6 +34,32 @@
+ /* How many entries shall _sss_getautomntent_r retrieve at once */
+ #define GETAUTOMNTENT_MAX_ENTRIES   512
+ 
++static atomic_uint _protocol = 0;
++
++unsigned int _sss_auto_protocol_version(unsigned int requested)
++{
++    switch (requested) {
++    case 0:
++        /* EHOSTDOWN will be translated to ENOENT */
++        _protocol = 0;
++        return 0;
++    default:
++        /* There is no other protocol version at this point. */
++        _protocol = 1;
++        return 1;
++    }
++}
++
++/* Returns correct errno based on autofs version expectations. */
++static errno_t errnop_to_errno(int errnop)
++{
++    if (errnop == EHOSTDOWN && _protocol == 0) {
++        return ENOENT;
++    }
++
++    return errnop;
++}
++
+ struct automtent {
+     char *mapname;
+     size_t cursor;
+@@ -93,7 +120,7 @@ _sss_setautomntent(const char *mapname, void **context)
+                                   &repbuf, &replen, &errnop);
+     if (ret != SSS_STATUS_SUCCESS) {
+         free(name);
+-        ret = errnop;
++        ret = errnop_to_errno(errnop);
+         goto out;
+     }
+ 
+@@ -310,7 +337,7 @@ _sss_getautomntent_r(char **key, char **value, void *context)
+                                   &repbuf, &replen, &errnop);
+     free(data);
+     if (ret != SSS_STATUS_SUCCESS) {
+-        ret = errnop;
++        ret = errnop_to_errno(errnop);
+         goto out;
+     }
+ 
+@@ -408,7 +435,7 @@ _sss_getautomntbyname_r(const char *key, char **value, void *context)
+                                   &repbuf, &replen, &errnop);
+     free(data);
+     if (ret != SSS_STATUS_SUCCESS) {
+-        ret = errnop;
++        ret = errnop_to_errno(errnop);
+         goto out;
+     }
+ 
+@@ -467,7 +494,7 @@ _sss_endautomntent(void **context)
+     ret = sss_autofs_make_request(SSS_AUTOFS_ENDAUTOMNTENT,
+                                   NULL, NULL, NULL, &errnop);
+     if (ret != SSS_STATUS_SUCCESS) {
+-        ret = errnop;
++        ret = errnop_to_errno(errnop);
+         goto out;
+     }
+ 
+diff --git a/src/sss_client/autofs/sss_autofs.exports b/src/sss_client/autofs/sss_autofs.exports
+index f9ce8f5b2..ec61f715e 100644
+--- a/src/sss_client/autofs/sss_autofs.exports
++++ b/src/sss_client/autofs/sss_autofs.exports
+@@ -2,10 +2,11 @@ EXPORTED {
+ 
+     # public functions
+     global:
+-                _sss_setautomntent;
+-                _sss_getautomntent_r;
+-                _sss_getautomntbyname_r;
+-                _sss_endautomntent;
++        _sss_auto_protocol_version;
++        _sss_setautomntent;
++        _sss_getautomntent_r;
++        _sss_getautomntbyname_r;
++        _sss_endautomntent;
+ 
+     # everything else is local
+     local:
+diff --git a/src/sss_client/autofs/sss_autofs_private.h b/src/sss_client/autofs/sss_autofs_private.h
+index 6459c1cc7..7fd49db1d 100644
+--- a/src/sss_client/autofs/sss_autofs_private.h
++++ b/src/sss_client/autofs/sss_autofs_private.h
+@@ -21,6 +21,11 @@
+ #include <errno.h>
+ #include "util/util.h"
+ 
++/**
++ * Choose an autofs protocol version to be used between autofs and sss_autofs.
++ */
++unsigned int _sss_auto_protocol_version(unsigned int requested);
++
+ /**
+  * Selects a map for processing.
+  */
+-- 
+2.21.3
+
