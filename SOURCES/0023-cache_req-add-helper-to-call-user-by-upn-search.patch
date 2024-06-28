@@ -1,0 +1,70 @@
+From a3e2677f919c6b1b1649ad80cc3435b4bb2efc0d Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pavel=20B=C5=99ezina?= <pbrezina@redhat.com>
+Date: Thu, 10 Dec 2020 19:28:58 +0100
+Subject: [PATCH 23/27] cache_req: add helper to call user by upn search
+
+Reviewed-by: Robbie Harwood <rharwood@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+---
+ src/responder/common/cache_req/cache_req.h    | 13 +++++++++++
+ .../cache_req/plugins/cache_req_user_by_upn.c | 23 +++++++++++++++++++
+ 2 files changed, 36 insertions(+)
+
+diff --git a/src/responder/common/cache_req/cache_req.h b/src/responder/common/cache_req/cache_req.h
+index d36cb2d3b..d301a076e 100644
+--- a/src/responder/common/cache_req/cache_req.h
++++ b/src/responder/common/cache_req/cache_req.h
+@@ -277,6 +277,19 @@ cache_req_user_by_name_attrs_send(TALLOC_CTX *mem_ctx,
+ #define cache_req_user_by_name_attrs_recv(mem_ctx, req, _result) \
+     cache_req_single_domain_recv(mem_ctx, req, _result)
+ 
++struct tevent_req *
++cache_req_user_by_upn_send(TALLOC_CTX *mem_ctx,
++                           struct tevent_context *ev,
++                           struct resp_ctx *rctx,
++                           struct sss_nc_ctx *ncache,
++                           int cache_refresh_percent,
++                           enum cache_req_dom_type req_dom_type,
++                           const char *domain,
++                           const char *upn);
++
++#define cache_req_user_by_upn_recv(mem_ctx, req, _result) \
++    cache_req_single_domain_recv(mem_ctx, req, _result);
++
+ struct tevent_req *
+ cache_req_user_by_id_send(TALLOC_CTX *mem_ctx,
+                           struct tevent_context *ev,
+diff --git a/src/responder/common/cache_req/plugins/cache_req_user_by_upn.c b/src/responder/common/cache_req/plugins/cache_req_user_by_upn.c
+index e08ab70ae..037994c8c 100644
+--- a/src/responder/common/cache_req/plugins/cache_req_user_by_upn.c
++++ b/src/responder/common/cache_req/plugins/cache_req_user_by_upn.c
+@@ -133,3 +133,26 @@ const struct cache_req_plugin cache_req_user_by_upn = {
+     .dp_get_domain_send_fn = NULL,
+     .dp_get_domain_recv_fn = NULL,
+ };
++
++struct tevent_req *
++cache_req_user_by_upn_send(TALLOC_CTX *mem_ctx,
++                           struct tevent_context *ev,
++                           struct resp_ctx *rctx,
++                           struct sss_nc_ctx *ncache,
++                           int cache_refresh_percent,
++                           enum cache_req_dom_type req_dom_type,
++                           const char *domain,
++                           const char *upn)
++{
++    struct cache_req_data *data;
++
++    data = cache_req_data_name(mem_ctx, CACHE_REQ_USER_BY_UPN, upn);
++    if (data == NULL) {
++        return NULL;
++    }
++
++    return cache_req_steal_data_and_send(mem_ctx, ev, rctx, ncache,
++                                         cache_refresh_percent,
++                                         req_dom_type, domain,
++                                         data);
++}
+-- 
+2.21.3
+

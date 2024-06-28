@@ -1,0 +1,34 @@
+From c0ae6d34ff7c170ca0e6d0faa8a2daf9a77becb7 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pavel=20B=C5=99ezina?= <pbrezina@redhat.com>
+Date: Fri, 8 Jan 2021 14:00:47 +0100
+Subject: [PATCH] pamsrv_gssapi: fix implicit conversion warning
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+src/responder/pam/pamsrv_gssapi.c: In function ‘pam_cmd_gssapi_sec_ctx’:
+src/responder/pam/pamsrv_gssapi.c:716:64: error: implicit conversion from ‘enum sss_domain_type’ to ‘enum cache_req_dom_type’ [-Werror=enum-conversion]
+  716 |                                      cli_ctx->rctx->ncache, 0, DOM_TYPE_POSIX,
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ src/responder/pam/pamsrv_gssapi.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/responder/pam/pamsrv_gssapi.c b/src/responder/pam/pamsrv_gssapi.c
+index 099675e1c..2d05c7888 100644
+--- a/src/responder/pam/pamsrv_gssapi.c
++++ b/src/responder/pam/pamsrv_gssapi.c
+@@ -713,7 +713,8 @@ pam_cmd_gssapi_sec_ctx(struct cli_ctx *cli_ctx)
+     DEBUG(SSSDBG_TRACE_FUNC, "Checking that target user matches UPN\n");
+ 
+     req = cache_req_user_by_upn_send(cli_ctx, cli_ctx->ev, cli_ctx->rctx,
+-                                     cli_ctx->rctx->ncache, 0, DOM_TYPE_POSIX,
++                                     cli_ctx->rctx->ncache, 0,
++                                     CACHE_REQ_POSIX_DOM,
+                                      domain->name, state->authenticated_upn);
+     if (req == NULL) {
+         DEBUG(SSSDBG_CRIT_FAILURE, "Out of memory!\n");
+-- 
+2.21.3
+

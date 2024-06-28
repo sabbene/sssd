@@ -1,0 +1,121 @@
+From b100efbfabd96dcfb2825777b75b9a9dfaacb937 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pavel=20B=C5=99ezina?= <pbrezina@redhat.com>
+Date: Fri, 29 Jan 2021 12:41:28 +0100
+Subject: [PATCH] sudo: do not search by low usn value to improve performance
+
+This is a follow up on these two commits.
+
+- 819d70ef6e6fa0e736ebd60a7f8a26f672927d57
+- 6815844daa7701c76e31addbbdff74656cd30bea
+
+The first one improved the search filter little bit to achieve better
+performance, however it also changed the behavior: we started to search
+for `usn >= 1` in the filter if no usn number was known.
+
+This caused issues on OpenLDAP server which was fixed by the second patch.
+However, the fix was wrong and searching by this meaningfully low number
+can cause performance issues depending on how the filter is optimized and
+evaluated on the server.
+
+Now we omit the usn attribute from the filter if there is no meaningful value.
+
+How to test:
+1. Setup LDAP with no sudo rules defined
+2. Make sure that the LDAP server does not support USN or use the following diff
+   to enforce modifyTimestamp (last USN is always available from rootDSE)
+```diff
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ src/providers/ldap/sdap.c              |  4 ++--
+ src/providers/ldap/sdap_sudo_refresh.c |  6 ++++--
+ src/providers/ldap/sdap_sudo_shared.c  | 21 ++++++---------------
+ 3 files changed, 12 insertions(+), 19 deletions(-)
+
+diff --git a/src/providers/ldap/sdap.c b/src/providers/ldap/sdap.c
+index 32c0144b9..c853e4dc1 100644
+--- a/src/providers/ldap/sdap.c
++++ b/src/providers/ldap/sdap.c
+@@ -1391,7 +1391,7 @@ int sdap_get_server_opts_from_rootdse(TALLOC_CTX *memctx,
+     last_usn_name = opts->gen_map[SDAP_AT_LAST_USN].name;
+     entry_usn_name = opts->gen_map[SDAP_AT_ENTRY_USN].name;
+     if (rootdse) {
+-        if (last_usn_name) {
++        if (false) {
+             ret = sysdb_attrs_get_string(rootdse,
+                                           last_usn_name, &last_usn_value);
+             if (ret != EOK) {
+@@ -1500,7 +1500,7 @@ int sdap_get_server_opts_from_rootdse(TALLOC_CTX *memctx,
+         }
+     }
+ 
+-    if (!last_usn_name) {
++    if (true) {
+         DEBUG(SSSDBG_FUNC_DATA,
+               "No known USN scheme is supported by this server!\n");
+         if (!entry_usn_name) {
+diff --git a/src/providers/ldap/sdap_sudo_refresh.c b/src/providers/ldap/sdap_sudo_refresh.c
+index ddcb23781..83f944ccf 100644
+--- a/src/providers/ldap/sdap_sudo_refresh.c
++++ b/src/providers/ldap/sdap_sudo_refresh.c
+@@ -181,8 +181,10 @@ struct tevent_req *sdap_sudo_smart_refresh_send(TALLOC_CTX *mem_ctx,
+     state->sysdb = id_ctx->be->domain->sysdb;
+ 
+     /* Download all rules from LDAP that are newer than usn */
+-    if (srv_opts == NULL || srv_opts->max_sudo_value == 0) {
+-        DEBUG(SSSDBG_TRACE_FUNC, "USN value is unknown, assuming zero.\n");
++    if (srv_opts == NULL || srv_opts->max_sudo_value == NULL
++         || strcmp(srv_opts->max_sudo_value, "0") == 0) {
++        DEBUG(SSSDBG_TRACE_FUNC, "USN value is unknown, assuming zero and "
++              "omitting it from the filter.\n");
+         usn = "0";
+         search_filter = talloc_asprintf(state, "(%s=%s)",
+                                         map[SDAP_AT_SUDO_OC].name,
+diff --git a/src/providers/ldap/sdap_sudo_shared.c b/src/providers/ldap/sdap_sudo_shared.c
+index 4f09957ea..75d1bc3d8 100644
+--- a/src/providers/ldap/sdap_sudo_shared.c
++++ b/src/providers/ldap/sdap_sudo_shared.c
+@@ -129,25 +129,17 @@ sdap_sudo_ptask_setup_generic(struct be_ctx *be_ctx,
+ static char *
+ sdap_sudo_new_usn(TALLOC_CTX *mem_ctx,
+                   unsigned long usn,
+-                  const char *leftover,
+-                  bool supports_usn)
++                  const char *leftover)
+ {
+     const char *str = leftover == NULL ? "" : leftover;
+     char *newusn;
+ 
+-    /* This is a fresh start and server uses modifyTimestamp. We need to
+-     * provide proper datetime value. */
+-    if (!supports_usn && usn == 0) {
+-        newusn = talloc_strdup(mem_ctx, "00000101000000Z");
+-        if (newusn == NULL) {
+-            DEBUG(SSSDBG_MINOR_FAILURE, "Unable to change USN value (OOM)!\n");
+-            return NULL;
+-        }
+-
+-        return newusn;
++    /* Current largest USN is unknown so we keep "0" to indicate it. */
++    if (usn == 0) {
++        return talloc_strdup(mem_ctx, "0");
+     }
+ 
+-    /* We increment USN number so that we can later use simplify filter
++    /* We increment USN number so that we can later use simplified filter
+      * (just usn >= last+1 instead of usn >= last && usn != last).
+      */
+     usn++;
+@@ -219,8 +211,7 @@ sdap_sudo_set_usn(struct sdap_server_opts *srv_opts,
+         srv_opts->last_usn = usn_number;
+     }
+ 
+-    newusn = sdap_sudo_new_usn(srv_opts, srv_opts->last_usn, timezone,
+-                               srv_opts->supports_usn);
++    newusn = sdap_sudo_new_usn(srv_opts, srv_opts->last_usn, timezone);
+     if (newusn == NULL) {
+         return;
+     }
+-- 
+2.21.3
+

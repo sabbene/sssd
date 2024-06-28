@@ -1,0 +1,36 @@
+From 49eb871847a94311bbd2190a315230e4bae1ea2c Mon Sep 17 00:00:00 2001
+From: Justin Stephenson <jstephen@redhat.com>
+Date: Mon, 1 Aug 2022 09:54:51 -0400
+Subject: [PATCH] CACHE_REQ: Fix hybrid lookup log spamming
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Skip calling cache_req_data_set_hybrid_lookup() when hybrid data
+is NULL for certain NSS request types (e.g. Service by Name).
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+(cherry picked from commit 96a1dce8096d45e986ab01aaac11d8c77c36d1d7)
+---
+ src/responder/nss/nss_get_object.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/responder/nss/nss_get_object.c b/src/responder/nss/nss_get_object.c
+index 9762d6bfe..5a2e7e9bd 100644
+--- a/src/responder/nss/nss_get_object.c
++++ b/src/responder/nss/nss_get_object.c
+@@ -171,7 +171,9 @@ hybrid_domain_retry_data(TALLOC_CTX *mem_ctx,
+                                           input_name);
+     }
+ 
+-    cache_req_data_set_hybrid_lookup(hybrid_data, true);
++    if (hybrid_data != NULL) {
++        cache_req_data_set_hybrid_lookup(hybrid_data, true);
++    }
+ 
+     return hybrid_data;
+ }
+-- 
+2.37.1
+

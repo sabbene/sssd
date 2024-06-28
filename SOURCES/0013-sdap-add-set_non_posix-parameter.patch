@@ -1,0 +1,351 @@
+From f5ce7c1dae2725df54a36e79ac06d1b48da54f5d Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Tue, 9 Jan 2024 11:14:42 +0100
+Subject: [PATCH 13/13] sdap: add set_non_posix parameter
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This patch adds a new parameter set_non_posix to the user and group
+lookup calls. Currently the domain type is used to determine if the
+search should be restricted to POSIX objects or not. The new option
+allows to drop this restriction explicitly to look up non-POSIX objects.
+
+Resolves: https://github.com/SSSD/sssd/issues/5708
+
+Reviewed-by: Justin Stephenson <jstephen@redhat.com>
+Reviewed-by: Tomáš Halman <thalman@redhat.com>
+(cherry picked from commit 5f63d9bfc71b271844db1ee122172630be1afed0)
+---
+ src/providers/ad/ad_gpo.c                     |  1 +
+ src/providers/ipa/ipa_subdomains_ext_groups.c |  2 +-
+ src/providers/ldap/ldap_common.h              |  6 ++-
+ src/providers/ldap/ldap_id.c                  | 38 +++++++++++--------
+ src/providers/ldap/sdap_async.h               |  3 +-
+ src/providers/ldap/sdap_async_initgroups.c    |  9 +++--
+ src/providers/ldap/sdap_async_initgroups_ad.c |  2 +-
+ src/providers/ldap/sdap_async_users.c         |  9 +++--
+ src/providers/ldap/sdap_users.h               |  3 +-
+ 9 files changed, 44 insertions(+), 29 deletions(-)
+
+diff --git a/src/providers/ad/ad_gpo.c b/src/providers/ad/ad_gpo.c
+index f78f17f7b..336d475d1 100644
+--- a/src/providers/ad/ad_gpo.c
++++ b/src/providers/ad/ad_gpo.c
+@@ -2111,6 +2111,7 @@ ad_gpo_connect_done(struct tevent_req *subreq)
+                                  state->host_fqdn,
+                                  BE_FILTER_NAME,
+                                  NULL,
++                                 true,
+                                  true);
+     tevent_req_set_callback(subreq, ad_gpo_target_dn_retrieval_done, req);
+ 
+diff --git a/src/providers/ipa/ipa_subdomains_ext_groups.c b/src/providers/ipa/ipa_subdomains_ext_groups.c
+index b385c2f27..f4f84749a 100644
+--- a/src/providers/ipa/ipa_subdomains_ext_groups.c
++++ b/src/providers/ipa/ipa_subdomains_ext_groups.c
+@@ -883,7 +883,7 @@ static void ipa_add_ad_memberships_get_next(struct tevent_req *req)
+                                  state->sdap_id_ctx->conn,
+                                  fq_name,
+                                  BE_FILTER_NAME,
+-                                 false, false);
++                                 false, false, false);
+     if (subreq == NULL) {
+         DEBUG(SSSDBG_OP_FAILURE, "groups_get_send failed.\n");
+         ret = ENOMEM;
+diff --git a/src/providers/ldap/ldap_common.h b/src/providers/ldap/ldap_common.h
+index 6df7b3df4..7159d6356 100644
+--- a/src/providers/ldap/ldap_common.h
++++ b/src/providers/ldap/ldap_common.h
+@@ -295,7 +295,8 @@ struct tevent_req *groups_get_send(TALLOC_CTX *memctx,
+                                    const char *name,
+                                    int filter_type,
+                                    bool noexist_delete,
+-                                   bool no_members);
++                                   bool no_members,
++                                   bool set_non_posix);
+ int groups_get_recv(struct tevent_req *req, int *dp_error_out, int *sdap_ret);
+ 
+ struct tevent_req *groups_by_user_send(TALLOC_CTX *memctx,
+@@ -306,7 +307,8 @@ struct tevent_req *groups_by_user_send(TALLOC_CTX *memctx,
+                                        const char *filter_value,
+                                        int filter_type,
+                                        const char *extra_value,
+-                                       bool noexist_delete);
++                                       bool noexist_delete,
++                                       bool set_non_posix);
+ 
+ int groups_by_user_recv(struct tevent_req *req, int *dp_error_out, int *sdap_ret);
+ 
+diff --git a/src/providers/ldap/ldap_id.c b/src/providers/ldap/ldap_id.c
+index fb81a1793..da54816bd 100644
+--- a/src/providers/ldap/ldap_id.c
++++ b/src/providers/ldap/ldap_id.c
+@@ -165,7 +165,8 @@ struct tevent_req *users_get_send(TALLOC_CTX *memctx,
+                                   const char *filter_value,
+                                   int filter_type,
+                                   const char *extra_value,
+-                                  bool noexist_delete)
++                                  bool noexist_delete,
++                                  bool set_non_posix)
+ {
+     struct tevent_req *req;
+     struct users_get_state *state;
+@@ -202,7 +203,7 @@ struct tevent_req *users_get_send(TALLOC_CTX *memctx,
+     state->filter_value = filter_value;
+     state->filter_type = filter_type;
+ 
+-    if (state->domain->type == DOM_TYPE_APPLICATION) {
++    if (state->domain->type == DOM_TYPE_APPLICATION || set_non_posix) {
+         state->non_posix = true;
+     }
+ 
+@@ -582,7 +583,8 @@ static void users_get_done(struct tevent_req *subreq)
+             ret = sdap_fallback_local_user(state, state->shortname, uid, &usr_attrs);
+             if (ret == EOK) {
+                 ret = sdap_save_user(state, state->ctx->opts, state->domain,
+-                                     usr_attrs[0], NULL, NULL, 0);
++                                     usr_attrs[0], NULL, NULL, 0,
++                                     state->non_posix);
+             }
+         }
+     }
+@@ -665,7 +667,8 @@ struct tevent_req *groups_get_send(TALLOC_CTX *memctx,
+                                    const char *filter_value,
+                                    int filter_type,
+                                    bool noexist_delete,
+-                                   bool no_members)
++                                   bool no_members,
++                                   bool set_non_posix)
+ {
+     struct tevent_req *req;
+     struct groups_get_state *state;
+@@ -703,7 +706,7 @@ struct tevent_req *groups_get_send(TALLOC_CTX *memctx,
+     state->filter_value = filter_value;
+     state->filter_type = filter_type;
+ 
+-    if (state->domain->type == DOM_TYPE_APPLICATION) {
++    if (state->domain->type == DOM_TYPE_APPLICATION || set_non_posix) {
+         state->non_posix = true;
+     }
+ 
+@@ -991,7 +994,8 @@ static void groups_get_done(struct tevent_req *subreq)
+                                 state->filter_value,
+                                 state->filter_type,
+                                 NULL,
+-                                state->noexist_delete);
++                                state->noexist_delete,
++                                false);
+         if (subreq == NULL) {
+             tevent_req_error(req, ENOMEM);
+             return;
+@@ -1159,7 +1163,8 @@ struct tevent_req *groups_by_user_send(TALLOC_CTX *memctx,
+                                        const char *filter_value,
+                                        int filter_type,
+                                        const char *extra_value,
+-                                       bool noexist_delete)
++                                       bool noexist_delete,
++                                       bool set_non_posix)
+ {
+     struct tevent_req *req;
+     struct groups_by_user_state *state;
+@@ -1188,7 +1193,7 @@ struct tevent_req *groups_by_user_send(TALLOC_CTX *memctx,
+     state->domain = sdom->dom;
+     state->sysdb = sdom->dom->sysdb;
+ 
+-    if (state->domain->type == DOM_TYPE_APPLICATION) {
++    if (state->domain->type == DOM_TYPE_APPLICATION || set_non_posix) {
+         state->non_posix = true;
+     }
+ 
+@@ -1252,7 +1257,8 @@ static void groups_by_user_connect_done(struct tevent_req *subreq)
+                                   state->filter_value,
+                                   state->filter_type,
+                                   state->extra_value,
+-                                  state->attrs);
++                                  state->attrs,
++                                  state->non_posix);
+     if (!subreq) {
+         tevent_req_error(req, ENOMEM);
+         return;
+@@ -1421,7 +1427,8 @@ sdap_handle_acct_req_send(TALLOC_CTX *mem_ctx,
+                                 ar->filter_value,
+                                 ar->filter_type,
+                                 ar->extra_value,
+-                                noexist_delete);
++                                noexist_delete,
++                                false);
+         break;
+ 
+     case BE_REQ_GROUP: /* group */
+@@ -1429,7 +1436,7 @@ sdap_handle_acct_req_send(TALLOC_CTX *mem_ctx,
+                                  sdom, conn,
+                                  ar->filter_value,
+                                  ar->filter_type,
+-                                 noexist_delete, false);
++                                 noexist_delete, false, false);
+         break;
+ 
+     case BE_REQ_INITGROUPS: /* init groups for user */
+@@ -1446,7 +1453,7 @@ sdap_handle_acct_req_send(TALLOC_CTX *mem_ctx,
+                                      ar->filter_value,
+                                      ar->filter_type,
+                                      ar->extra_value,
+-                                     noexist_delete);
++                                     noexist_delete, false);
+         break;
+ 
+     case BE_REQ_SUBID_RANGES:
+@@ -1545,7 +1552,8 @@ sdap_handle_acct_req_send(TALLOC_CTX *mem_ctx,
+                                 ar->filter_value,
+                                 ar->filter_type,
+                                 ar->extra_value,
+-                                noexist_delete);
++                                noexist_delete,
++                                false);
+         break;
+ 
+     default: /*fail*/
+@@ -1741,7 +1749,7 @@ static struct tevent_req *get_user_and_group_send(TALLOC_CTX *memctx,
+     subreq = groups_get_send(req, state->ev, state->id_ctx,
+                              state->sdom, state->conn,
+                              state->filter_val, state->filter_type,
+-                             state->noexist_delete, false);
++                             state->noexist_delete, false, false);
+     if (subreq == NULL) {
+         DEBUG(SSSDBG_OP_FAILURE, "groups_get_send failed.\n");
+         ret = ENOMEM;
+@@ -1795,7 +1803,7 @@ static void get_user_and_group_groups_done(struct tevent_req *subreq)
+     subreq = users_get_send(req, state->ev, state->id_ctx,
+                             state->sdom, user_conn,
+                             state->filter_val, state->filter_type, NULL,
+-                            state->noexist_delete);
++                            state->noexist_delete, false);
+     if (subreq == NULL) {
+         DEBUG(SSSDBG_OP_FAILURE, "users_get_send failed.\n");
+         tevent_req_error(req, ENOMEM);
+diff --git a/src/providers/ldap/sdap_async.h b/src/providers/ldap/sdap_async.h
+index a7b0f6912..5458d21f1 100644
+--- a/src/providers/ldap/sdap_async.h
++++ b/src/providers/ldap/sdap_async.h
+@@ -161,7 +161,8 @@ struct tevent_req *sdap_get_initgr_send(TALLOC_CTX *memctx,
+                                         const char *name,
+                                         int filter_type,
+                                         const char *extra_value,
+-                                        const char **grp_attrs);
++                                        const char **grp_attrs,
++                                        bool set_non_posix);
+ int sdap_get_initgr_recv(struct tevent_req *req);
+ 
+ struct tevent_req *sdap_exop_modify_passwd_send(TALLOC_CTX *memctx,
+diff --git a/src/providers/ldap/sdap_async_initgroups.c b/src/providers/ldap/sdap_async_initgroups.c
+index 4c8538e8a..97be594a3 100644
+--- a/src/providers/ldap/sdap_async_initgroups.c
++++ b/src/providers/ldap/sdap_async_initgroups.c
+@@ -2735,7 +2735,8 @@ struct tevent_req *sdap_get_initgr_send(TALLOC_CTX *memctx,
+                                         const char *filter_value,
+                                         int filter_type,
+                                         const char *extra_value,
+-                                        const char **grp_attrs)
++                                        const char **grp_attrs,
++                                        bool set_non_posix)
+ {
+     struct tevent_req *req;
+     struct sdap_get_initgr_state *state;
+@@ -2771,7 +2772,7 @@ struct tevent_req *sdap_get_initgr_send(TALLOC_CTX *memctx,
+         goto done;
+     }
+ 
+-    if (state->dom->type == DOM_TYPE_APPLICATION) {
++    if (state->dom->type == DOM_TYPE_APPLICATION || set_non_posix) {
+         state->non_posix = true;
+     }
+ 
+@@ -3099,7 +3100,7 @@ static void sdap_get_initgr_user(struct tevent_req *subreq)
+     DEBUG(SSSDBG_TRACE_ALL, "Storing the user\n");
+ 
+     ret = sdap_save_user(state, state->opts, state->dom, state->orig_user,
+-                         NULL, NULL, 0);
++                         NULL, NULL, 0, state->non_posix);
+     if (ret) {
+         goto fail;
+     }
+@@ -3435,7 +3436,7 @@ static void sdap_get_initgr_done(struct tevent_req *subreq)
+         subreq = groups_get_send(req, state->ev, state->id_ctx,
+                                  state->id_ctx->opts->sdom, state->conn,
+                                  gid, BE_FILTER_IDNUM, false,
+-                                 false);
++                                 false, false);
+         if (!subreq) {
+             ret = ENOMEM;
+             goto done;
+diff --git a/src/providers/ldap/sdap_async_initgroups_ad.c b/src/providers/ldap/sdap_async_initgroups_ad.c
+index bb18f35dc..fb80c9242 100644
+--- a/src/providers/ldap/sdap_async_initgroups_ad.c
++++ b/src/providers/ldap/sdap_async_initgroups_ad.c
+@@ -346,7 +346,7 @@ static errno_t sdap_ad_resolve_sids_step(struct tevent_req *req)
+ 
+     subreq = groups_get_send(state, state->ev, state->id_ctx, sdap_domain,
+                              state->conn, state->current_sid,
+-                             BE_FILTER_SECID, false, true);
++                             BE_FILTER_SECID, false, true, false);
+     if (subreq == NULL) {
+         return ENOMEM;
+     }
+diff --git a/src/providers/ldap/sdap_async_users.c b/src/providers/ldap/sdap_async_users.c
+index 9dcb59e23..728295d9d 100644
+--- a/src/providers/ldap/sdap_async_users.c
++++ b/src/providers/ldap/sdap_async_users.c
+@@ -175,7 +175,8 @@ int sdap_save_user(TALLOC_CTX *memctx,
+                    struct sysdb_attrs *attrs,
+                    struct sysdb_attrs *mapped_attrs,
+                    char **_usn_value,
+-                   time_t now)
++                   time_t now,
++                   bool set_non_posix)
+ {
+     struct ldb_message_element *el;
+     int ret;
+@@ -352,7 +353,7 @@ int sdap_save_user(TALLOC_CTX *memctx,
+         ret = sysdb_attrs_get_uint32_t(attrs,
+                                        opts->user_map[SDAP_AT_USER_UID].sys_name,
+                                        &uid);
+-        if (ret == ENOENT && dom->type == DOM_TYPE_APPLICATION) {
++        if (ret == ENOENT && (dom->type == DOM_TYPE_APPLICATION || set_non_posix)) {
+             DEBUG(SSSDBG_TRACE_INTERNAL,
+                   "Marking object as non-POSIX and setting ID=0!\n");
+             ret = sdap_set_non_posix_flag(user_attrs,
+@@ -450,7 +451,7 @@ int sdap_save_user(TALLOC_CTX *memctx,
+         ret = sysdb_attrs_get_uint32_t(attrs,
+                                        opts->user_map[SDAP_AT_USER_GID].sys_name,
+                                        &gid);
+-        if (ret == ENOENT && dom->type == DOM_TYPE_APPLICATION) {
++        if (ret == ENOENT && (dom->type == DOM_TYPE_APPLICATION || set_non_posix)) {
+             DEBUG(SSSDBG_TRACE_INTERNAL,
+                   "Marking object as non-POSIX and setting ID=0!\n");
+             ret = sdap_set_non_posix_flag(attrs,
+@@ -696,7 +697,7 @@ int sdap_save_users(TALLOC_CTX *memctx,
+         usn_value = NULL;
+ 
+         ret = sdap_save_user(tmpctx, opts, dom, users[i], mapped_attrs,
+-                             &usn_value, now);
++                             &usn_value, now, false);
+ 
+         /* Do not fail completely on errors.
+          * Just report the failure to save and go on */
+diff --git a/src/providers/ldap/sdap_users.h b/src/providers/ldap/sdap_users.h
+index a6d088a6d..74284cd0a 100644
+--- a/src/providers/ldap/sdap_users.h
++++ b/src/providers/ldap/sdap_users.h
+@@ -36,6 +36,7 @@ int sdap_save_user(TALLOC_CTX *memctx,
+                    struct sysdb_attrs *attrs,
+                    struct sysdb_attrs *mapped_attrs,
+                    char **_usn_value,
+-                   time_t now);
++                   time_t now,
++                   bool set_non_posix);
+ 
+ #endif /* _SDAP_USERS_H_ */
+-- 
+2.41.0
+

@@ -1,0 +1,34 @@
+From fff02bbf7967d291ccb019fae741e6591ed8fd41 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pavel=20B=C5=99ezina?= <pbrezina@redhat.com>
+Date: Fri, 12 Feb 2021 15:30:59 +0100
+Subject: [PATCH] ldap: fix modifytimestamp debugging leftovers
+
+---
+ src/providers/ldap/sdap.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/providers/ldap/sdap.c b/src/providers/ldap/sdap.c
+index c853e4dc1..32c0144b9 100644
+--- a/src/providers/ldap/sdap.c
++++ b/src/providers/ldap/sdap.c
+@@ -1391,7 +1391,7 @@ int sdap_get_server_opts_from_rootdse(TALLOC_CTX *memctx,
+     last_usn_name = opts->gen_map[SDAP_AT_LAST_USN].name;
+     entry_usn_name = opts->gen_map[SDAP_AT_ENTRY_USN].name;
+     if (rootdse) {
+-        if (false) {
++        if (last_usn_name) {
+             ret = sysdb_attrs_get_string(rootdse,
+                                           last_usn_name, &last_usn_value);
+             if (ret != EOK) {
+@@ -1500,7 +1500,7 @@ int sdap_get_server_opts_from_rootdse(TALLOC_CTX *memctx,
+         }
+     }
+ 
+-    if (true) {
++    if (!last_usn_name) {
+         DEBUG(SSSDBG_FUNC_DATA,
+               "No known USN scheme is supported by this server!\n");
+         if (!entry_usn_name) {
+-- 
+2.21.3
+

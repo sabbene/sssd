@@ -1,0 +1,80 @@
+From 11ed21e8e22188cbfb12fc3cd5e561fc78b3d5ad Mon Sep 17 00:00:00 2001
+From: Justin Stephenson <jstephen@redhat.com>
+Date: Wed, 10 Jan 2024 09:45:22 -0500
+Subject: [PATCH 16/16] Makefile: Respect BUILD_PASSKEY conditional
+
+---
+ Makefile.am                     | 10 ++++++++--
+ src/providers/krb5/krb5_child.c |  5 +++++
+ 2 files changed, 13 insertions(+), 2 deletions(-)
+
+diff --git a/Makefile.am b/Makefile.am
+index c58e336eb..1ff88dfce 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -1315,7 +1315,9 @@ endif
+ if BUILD_SYSTEMTAP
+ libsss_util_la_LIBADD += stap_generated_probes.lo
+ endif
++if BUILD_PASSKEY
+ libsss_util_la_SOURCES += src/db/sysdb_passkey_user_verification.c
++endif # BUILD_PASSKEY
+ libsss_util_la_LDFLAGS = -avoid-version
+ 
+ pkglib_LTLIBRARIES += libsss_semanage.la
+@@ -2616,7 +2618,6 @@ pam_srv_tests_SOURCES = \
+     src/responder/pam/pamsrv_cmd.c \
+     src/responder/pam/pamsrv_p11.c \
+     src/responder/pam/pamsrv_gssapi.c \
+-    src/responder/pam/pamsrv_passkey.c \
+     src/responder/pam/pam_helpers.c \
+     src/responder/pam/pamsrv_dp.c \
+     src/responder/pam/pam_prompting_config.c \
+@@ -2650,6 +2651,9 @@ pam_srv_tests_LDADD = \
+     libsss_iface.la \
+     libsss_sbus.la \
+     $(NULL)
++if BUILD_PASSKEY
++    pam_srv_tests_SOURCES += src/responder/pam/pamsrv_passkey.c
++endif # BUILD_PASSKEY
+ 
+ EXTRA_ssh_srv_tests_DEPENDENCIES = \
+     $(ldblib_LTLIBRARIES) \
+@@ -4656,8 +4660,10 @@ krb5_child_SOURCES = \
+     src/sss_client/common.c \
+     src/krb5_plugin/common/utils.c \
+     src/krb5_plugin/idp/idp_utils.c \
+-    src/krb5_plugin/passkey/passkey_utils.c \
+     $(NULL)
++if BUILD_PASSKEY
++    krb5_child_SOURCES += src/krb5_plugin/passkey/passkey_utils.c
++endif # BUILD_PASSKEY
+ krb5_child_CFLAGS = \
+     $(AM_CFLAGS) \
+     $(POPT_CFLAGS) \
+diff --git a/src/providers/krb5/krb5_child.c b/src/providers/krb5/krb5_child.c
+index ae2c23aa9..5f868fc57 100644
+--- a/src/providers/krb5/krb5_child.c
++++ b/src/providers/krb5/krb5_child.c
+@@ -999,6 +999,10 @@ static krb5_error_code answer_passkey(krb5_context kctx,
+                                       struct krb5_req *kr,
+                                       krb5_responder_context rctx)
+ {
++#ifndef BUILD_PASSKEY
++    DEBUG(SSSDBG_TRACE_FUNC, "Passkey auth not possible, SSSD built without passkey support!\n");
++    return EINVAL;
++#else
+     enum sss_authtok_type type;
+     struct sss_passkey_message *msg;
+     struct sss_passkey_message *reply_msg = NULL;
+@@ -1090,6 +1094,7 @@ done:
+     }
+ 
+     return kerr;
++#endif /* BUILD_PASSKEY */
+ }
+ 
+ static krb5_error_code sss_krb5_responder(krb5_context ctx,
+-- 
+2.41.0
+

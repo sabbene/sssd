@@ -1,0 +1,63 @@
+From a40b25a3af29706c058ce5a02dd0ba294dbb6874 Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Wed, 8 Feb 2023 17:48:52 +0100
+Subject: [PATCH 3/4] SSS_CLIENT: if poll() returns POLLNVAL then socket is
+ alredy closed (or wasn't open) so it shouldn't be closed again. Otherwise
+ there is a risk to close "foreign" socket opened in another thread.
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+(cherry picked from commit ef93284b5a1f196425d9a61e8e24de8972240eb3)
+---
+ src/sss_client/common.c | 18 +++++++++++++++---
+ 1 file changed, 15 insertions(+), 3 deletions(-)
+
+diff --git a/src/sss_client/common.c b/src/sss_client/common.c
+index 27e09f6f3..c8ade645b 100644
+--- a/src/sss_client/common.c
++++ b/src/sss_client/common.c
+@@ -159,7 +159,11 @@ static enum sss_status sss_cli_send_req(enum sss_cli_command cmd,
+             *errnop = ETIME;
+             break;
+         case 1:
+-            if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) {
++            if (pfd.revents & (POLLERR | POLLHUP)) {
++                *errnop = EPIPE;
++            } else if (pfd.revents & POLLNVAL) {
++                /* Invalid request: fd is not opened */
++                sss_cli_sd = -1;
+                 *errnop = EPIPE;
+             } else if (!(pfd.revents & POLLOUT)) {
+                 *errnop = EBUSY;
+@@ -270,7 +274,11 @@ static enum sss_status sss_cli_recv_rep(enum sss_cli_command cmd,
+             if (pfd.revents & (POLLHUP)) {
+                 pollhup = true;
+             }
+-            if (pfd.revents & (POLLERR | POLLNVAL)) {
++            if (pfd.revents & POLLERR) {
++                *errnop = EPIPE;
++            } else if (pfd.revents & POLLNVAL) {
++                /* Invalid request: fd is not opened */
++                sss_cli_sd = -1;
+                 *errnop = EPIPE;
+             } else if (!(pfd.revents & POLLIN)) {
+                 *errnop = EBUSY;
+@@ -721,7 +729,11 @@ static enum sss_status sss_cli_check_socket(int *errnop,
+             *errnop = ETIME;
+             break;
+         case 1:
+-            if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) {
++            if (pfd.revents & (POLLERR | POLLHUP)) {
++                *errnop = EPIPE;
++            } else if (pfd.revents & POLLNVAL) {
++                /* Invalid request: fd is not opened */
++                sss_cli_sd = -1;
+                 *errnop = EPIPE;
+             } else if (!(pfd.revents & (POLLIN | POLLOUT))) {
+                 *errnop = EBUSY;
+-- 
+2.37.3
+

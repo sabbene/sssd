@@ -1,0 +1,265 @@
+From f633f37e712cb0f7524a2ee257e15f34468149b4 Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Tue, 3 Nov 2020 09:58:52 +0100
+Subject: [PATCH 16/16] add tests multiple certs same id
+
+Add unit test for the case that two certificates use the same key.
+
+Resolves: https://github.com/SSSD/sssd/issues/5400
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ src/tests/cmocka/test_pam_srv.c              | 116 +++++++++++++++++++
+ src/tests/test_CA/Makefile.am                |  26 ++++-
+ src/tests/test_CA/SSSD_test_cert_0006.config |  20 ++++
+ 3 files changed, 161 insertions(+), 1 deletion(-)
+ create mode 100644 src/tests/test_CA/SSSD_test_cert_0006.config
+
+diff --git a/src/tests/cmocka/test_pam_srv.c b/src/tests/cmocka/test_pam_srv.c
+index 5506fbf34..8ca5abd43 100644
+--- a/src/tests/cmocka/test_pam_srv.c
++++ b/src/tests/cmocka/test_pam_srv.c
+@@ -40,12 +40,14 @@
+ #include "tests/test_CA/SSSD_test_cert_x509_0001.h"
+ #include "tests/test_CA/SSSD_test_cert_x509_0002.h"
+ #include "tests/test_CA/SSSD_test_cert_x509_0005.h"
++#include "tests/test_CA/SSSD_test_cert_x509_0006.h"
+ 
+ #include "tests/test_ECC_CA/SSSD_test_ECC_cert_x509_0001.h"
+ #else
+ #define SSSD_TEST_CERT_0001 ""
+ #define SSSD_TEST_CERT_0002 ""
+ #define SSSD_TEST_CERT_0005 ""
++#define SSSD_TEST_CERT_0006 ""
+ 
+ #define SSSD_TEST_ECC_CERT_0001 ""
+ #endif
+@@ -1093,6 +1095,13 @@ static int test_pam_creds_insufficient_check(uint32_t status,
+     return EOK;
+ }
+ 
++static int test_pam_auth_err_check(uint32_t status, uint8_t *body, size_t blen)
++{
++    /* PAM_AUTH_ERR is returned for different types of error, we use different
++     * names for the check functions to make the purpose more clear. */
++    return test_pam_wrong_pw_offline_auth_check(status, body, blen);
++}
++
+ static int test_pam_user_unknown_check(uint32_t status,
+                                        uint8_t *body, size_t blen)
+ {
+@@ -2500,6 +2509,107 @@ void test_pam_cert_auth_2certs_one_mapping(void **state)
+     assert_int_equal(ret, EOK);
+ }
+ 
++/* The following three tests cover a use case where multiple certificates are
++ * using the same key-pair. According to PKCS#11 specs "The CKA_ID field is
++ * intended to distinguish among multiple keys. In the case of public and
++ * private keys, this field assists in handling multiple keys held by the same
++ * subject; the key identifier for a public key and its corresponding private
++ * key should be the same. The key identifier should also be the same as for
++ * the corresponding certificate, if one exists. Cryptoki does not enforce
++ * these associations, however." As a result certificates sharing the same
++ * key-pair will have the same id on the Smartcard. This means a second
++ * parameter is needed to distinguish them. We use the label here.
++ *
++ * The first test makes sure authentication fails is the label is missing, the
++ * second and third test make sure that each certificate can be selected with
++ * the proper label. */
++void test_pam_cert_auth_2certs_same_id_no_label(void **state)
++{
++    int ret;
++
++    set_cert_auth_param(pam_test_ctx->pctx, CA_DB);
++    putenv(discard_const("SOFTHSM2_CONF=" ABS_BUILD_DIR "/src/tests/test_CA/softhsm2_2certs_same_id.conf"));
++
++    mock_input_pam_cert(pam_test_ctx, "pamuser", "123456", "SSSD Test Token",
++                        TEST_MODULE_NAME,
++                        "11111111",
++                        NULL, NULL,
++                        NULL, SSSD_TEST_CERT_0001);
++
++    will_return(__wrap_sss_packet_get_cmd, SSS_PAM_AUTHENTICATE);
++    will_return(__wrap_sss_packet_get_body, WRAP_CALL_REAL);
++
++    /* Assume backend cannot handle Smartcard credentials */
++    pam_test_ctx->exp_pam_status = PAM_BAD_ITEM;
++
++    set_cmd_cb(test_pam_auth_err_check);
++    ret = sss_cmd_execute(pam_test_ctx->cctx, SSS_PAM_AUTHENTICATE,
++                          pam_test_ctx->pam_cmds);
++    assert_int_equal(ret, EOK);
++
++    /* Wait until the test finishes with EOK */
++    ret = test_ev_loop(pam_test_ctx->tctx);
++    assert_int_equal(ret, EOK);
++}
++
++void test_pam_cert_auth_2certs_same_id_with_label_1(void **state)
++{
++    int ret;
++
++    set_cert_auth_param(pam_test_ctx->pctx, CA_DB);
++    putenv(discard_const("SOFTHSM2_CONF=" ABS_BUILD_DIR "/src/tests/test_CA/softhsm2_2certs_same_id.conf"));
++
++    mock_input_pam_cert(pam_test_ctx, "pamuser", "123456", "SSSD Test Token",
++                        TEST_MODULE_NAME,
++                        "11111111",
++                        "SSSD test cert 0001", NULL,
++                        test_lookup_by_cert_double_cb, SSSD_TEST_CERT_0001);
++
++    will_return(__wrap_sss_packet_get_cmd, SSS_PAM_AUTHENTICATE);
++    will_return(__wrap_sss_packet_get_body, WRAP_CALL_REAL);
++
++    /* Assume backend cannot handle Smartcard credentials */
++    pam_test_ctx->exp_pam_status = PAM_BAD_ITEM;
++
++    set_cmd_cb(test_pam_simple_check_success);
++    ret = sss_cmd_execute(pam_test_ctx->cctx, SSS_PAM_AUTHENTICATE,
++                          pam_test_ctx->pam_cmds);
++    assert_int_equal(ret, EOK);
++
++    /* Wait until the test finishes with EOK */
++    ret = test_ev_loop(pam_test_ctx->tctx);
++    assert_int_equal(ret, EOK);
++}
++
++void test_pam_cert_auth_2certs_same_id_with_label_6(void **state)
++{
++    int ret;
++
++    set_cert_auth_param(pam_test_ctx->pctx, CA_DB);
++    putenv(discard_const("SOFTHSM2_CONF=" ABS_BUILD_DIR "/src/tests/test_CA/softhsm2_2certs_same_id.conf"));
++
++    mock_input_pam_cert(pam_test_ctx, "pamuser", "123456", "SSSD Test Token",
++                        TEST_MODULE_NAME,
++                        "11111111",
++                        "SSSD test cert 0006", NULL,
++                        test_lookup_by_cert_double_cb, SSSD_TEST_CERT_0006);
++
++    will_return(__wrap_sss_packet_get_cmd, SSS_PAM_AUTHENTICATE);
++    will_return(__wrap_sss_packet_get_body, WRAP_CALL_REAL);
++
++    /* Assume backend cannot handle Smartcard credentials */
++    pam_test_ctx->exp_pam_status = PAM_BAD_ITEM;
++
++    set_cmd_cb(test_pam_simple_check_success);
++    ret = sss_cmd_execute(pam_test_ctx->cctx, SSS_PAM_AUTHENTICATE,
++                          pam_test_ctx->pam_cmds);
++    assert_int_equal(ret, EOK);
++
++    /* Wait until the test finishes with EOK */
++    ret = test_ev_loop(pam_test_ctx->tctx);
++    assert_int_equal(ret, EOK);
++}
++
+ void test_pam_cert_preauth_uri_token1(void **state)
+ {
+     int ret;
+@@ -3179,6 +3289,12 @@ int main(int argc, const char *argv[])
+                                         pam_test_setup, pam_test_teardown),
+         cmocka_unit_test_setup_teardown(test_pam_cert_auth_2certs_one_mapping,
+                                         pam_test_setup, pam_test_teardown),
++        cmocka_unit_test_setup_teardown(test_pam_cert_auth_2certs_same_id_no_label,
++                                        pam_test_setup, pam_test_teardown),
++        cmocka_unit_test_setup_teardown(test_pam_cert_auth_2certs_same_id_with_label_1,
++                                        pam_test_setup, pam_test_teardown),
++        cmocka_unit_test_setup_teardown(test_pam_cert_auth_2certs_same_id_with_label_6,
++                                        pam_test_setup, pam_test_teardown),
+         cmocka_unit_test_setup_teardown(test_pam_cert_auth_no_logon_name,
+                                         pam_test_setup, pam_test_teardown),
+         cmocka_unit_test_setup_teardown(test_pam_cert_auth_no_logon_name_no_key_id,
+diff --git a/src/tests/test_CA/Makefile.am b/src/tests/test_CA/Makefile.am
+index 0e0122737..8765d0fd6 100644
+--- a/src/tests/test_CA/Makefile.am
++++ b/src/tests/test_CA/Makefile.am
+@@ -6,6 +6,7 @@ dist_noinst_DATA = \
+     SSSD_test_cert_0003.config \
+     SSSD_test_cert_0004.config \
+     SSSD_test_cert_0005.config \
++    SSSD_test_cert_0006.config \
+     SSSD_test_cert_key_0001.pem \
+     SSSD_test_cert_key_0002.pem \
+     SSSD_test_cert_key_0003.pem \
+@@ -25,7 +26,7 @@ pubkeys = $(addprefix SSSD_test_cert_pubsshkey_,$(addsuffix .pub,$(ids)))
+ pubkeys_h = $(addprefix SSSD_test_cert_pubsshkey_,$(addsuffix .h,$(ids)))
+ pkcs12 = $(addprefix SSSD_test_cert_pkcs12_,$(addsuffix .pem,$(ids)))
+ 
+-extra = softhsm2_none softhsm2_one softhsm2_two softhsm2_2tokens softhsm2_ocsp
++extra = softhsm2_none softhsm2_one softhsm2_two softhsm2_2tokens softhsm2_ocsp softhsm2_2certs_same_id
+ if HAVE_FAKETIME
+ extra += SSSD_test_CA_expired_crl.pem
+ endif
+@@ -41,6 +42,14 @@ $(pwdfile):
+ SSSD_test_CA.pem: $(openssl_ca_key) $(openssl_ca_config) serial
+ 	$(OPENSSL) req -batch -config ${openssl_ca_config} -x509 -new -nodes -key $< -sha256 -days 1024 -set_serial 0 -extensions v3_ca -out $@
+ 
++# SSSD_test_cert_0006 should use the same key as SSSD_test_cert_0001
++.INTERMEDIATE: SSSD_test_cert_req_0006.pem
++SSSD_test_cert_req_0006.pem: $(srcdir)/SSSD_test_cert_key_0001.pem $(srcdir)/SSSD_test_cert_0006.config
++	if [ $(shell grep -c req_exts $(srcdir)/SSSD_test_cert_0006.config) -eq 0 ]; then \
++		$(OPENSSL) req -new -nodes -key $< -config $(srcdir)/SSSD_test_cert_0006.config -out $@ ; \
++	else \
++		$(OPENSSL) req -new -nodes -key $< -reqexts req_exts -config $(srcdir)/SSSD_test_cert_0006.config -out $@ ; \
++	fi
+ 
+ SSSD_test_cert_req_%.pem: $(srcdir)/SSSD_test_cert_key_%.pem $(srcdir)/SSSD_test_cert_%.config
+ 	if [ $(shell grep -c req_exts $(srcdir)/SSSD_test_cert_$*.config) -eq 0 ]; then \
+@@ -52,6 +61,9 @@ SSSD_test_cert_req_%.pem: $(srcdir)/SSSD_test_cert_key_%.pem $(srcdir)/SSSD_test
+ SSSD_test_cert_x509_%.pem: SSSD_test_cert_req_%.pem $(openssl_ca_config) SSSD_test_CA.pem
+ 	$(OPENSSL) ca -config ${openssl_ca_config} -batch -notext -keyfile $(openssl_ca_key) -in $< -days 200 -extensions usr_cert -out $@
+ 
++SSSD_test_cert_pkcs12_0006.pem: SSSD_test_cert_x509_0006.pem $(srcdir)/SSSD_test_cert_key_0001.pem $(pwdfile)
++	$(OPENSSL) pkcs12 -export -in SSSD_test_cert_x509_0006.pem -inkey $(srcdir)/SSSD_test_cert_key_0001.pem -nodes -passout file:$(pwdfile) -out $@
++
+ SSSD_test_cert_pkcs12_%.pem: SSSD_test_cert_x509_%.pem $(srcdir)/SSSD_test_cert_key_%.pem $(pwdfile)
+ 	$(OPENSSL) pkcs12 -export -in SSSD_test_cert_x509_$*.pem -inkey $(srcdir)/SSSD_test_cert_key_$*.pem -nodes -passout file:$(pwdfile) -out $@
+ 
+@@ -130,6 +142,18 @@ softhsm2_ocsp.conf:
+ 	@echo "objectstore.backend = file" >> $@
+ 	@echo "slots.removable = true" >> $@
+ 
++softhsm2_2certs_same_id: softhsm2_2certs_same_id.conf SSSD_test_cert_x509_0001.pem SSSD_test_cert_x509_0006.pem
++	mkdir $@
++	SOFTHSM2_CONF=./$< $(SOFTHSM2_UTIL) --init-token  --label "SSSD Test Token" --pin 123456 --so-pin 123456 --free
++	GNUTLS_PIN=123456 SOFTHSM2_CONF=./$< $(P11TOOL) --provider=$(SOFTHSM2_PATH) --write --no-mark-private --load-certificate=SSSD_test_cert_x509_0006.pem --login  --label 'SSSD test cert 0006' --id '11111111'
++	GNUTLS_PIN=123456 SOFTHSM2_CONF=./$< $(P11TOOL) --provider=$(SOFTHSM2_PATH) --write --no-mark-private --load-certificate=SSSD_test_cert_x509_0001.pem --login  --label 'SSSD test cert 0001' --id '11111111'
++	GNUTLS_PIN=123456 SOFTHSM2_CONF=./$< $(P11TOOL) --provider=$(SOFTHSM2_PATH) --write --load-privkey=$(srcdir)/SSSD_test_cert_key_0001.pem --login  --label 'SSSD test cert 0001' --id '11111111'
++
++softhsm2_2certs_same_id.conf:
++	@echo "directories.tokendir = "$(abs_top_builddir)"/src/tests/test_CA/softhsm2_2certs_same_id" > $@
++	@echo "objectstore.backend = file" >> $@
++	@echo "slots.removable = true" >> $@
++
+ CLEANFILES = \
+     index.txt  index.txt.attr \
+     index.txt.attr.old  index.txt.old \
+diff --git a/src/tests/test_CA/SSSD_test_cert_0006.config b/src/tests/test_CA/SSSD_test_cert_0006.config
+new file mode 100644
+index 000000000..762de55cd
+--- /dev/null
++++ b/src/tests/test_CA/SSSD_test_cert_0006.config
+@@ -0,0 +1,20 @@
++# This certificate is used in
++# - src/tests/cmocka/test_pam_srv.c
++# and should use the same key-pair as SSSD_test_cert_0001
++[ req ]
++distinguished_name = req_distinguished_name
++prompt = no
++
++[ req_distinguished_name ]
++O = SSSD
++OU = SSSD test
++CN = SSSD test cert 0006
++
++[ req_exts ]
++basicConstraints = CA:FALSE
++nsCertType = client, email
++nsComment = "SSSD test Certificate"
++subjectKeyIdentifier = hash
++keyUsage = critical, nonRepudiation, digitalSignature, keyEncipherment
++extendedKeyUsage = clientAuth, emailProtection
++subjectAltName = email:sssd-devel@lists.fedorahosted.org,URI:https://github.com/SSSD/sssd//
+-- 
+2.21.3
+

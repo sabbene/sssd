@@ -1,0 +1,89 @@
+From 2bad4d4b299440d33919a9fdb8c4d75814583e12 Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Thu, 7 May 2020 21:24:42 +0200
+Subject: [PATCH 16/19] ad: rename ads_get_root_id_ctx() to ads_get_dom_id_ctx
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Since the function can be used to get the id ctx of any domain the
+'root' is removed from the name.
+
+Resolves: https://github.com/SSSD/sssd/issues/5151
+
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+---
+ src/providers/ad/ad_subdomains.c | 32 ++++++++++++++++----------------
+ 1 file changed, 16 insertions(+), 16 deletions(-)
+
+diff --git a/src/providers/ad/ad_subdomains.c b/src/providers/ad/ad_subdomains.c
+index c53962283..a9a552ff7 100644
+--- a/src/providers/ad/ad_subdomains.c
++++ b/src/providers/ad/ad_subdomains.c
+@@ -1231,37 +1231,37 @@ static errno_t ad_get_slave_domain_recv(struct tevent_req *req)
+ }
+ 
+ static struct ad_id_ctx *
+-ads_get_root_id_ctx(struct be_ctx *be_ctx,
+-                    struct ad_id_ctx *ad_id_ctx,
+-                    struct sss_domain_info *root_domain,
+-                    struct sdap_options *opts)
++ads_get_dom_id_ctx(struct be_ctx *be_ctx,
++                   struct ad_id_ctx *ad_id_ctx,
++                   struct sss_domain_info *domain,
++                   struct sdap_options *opts)
+ {
+     errno_t ret;
+     struct sdap_domain *sdom;
+-    struct ad_id_ctx *root_id_ctx;
++    struct ad_id_ctx *dom_id_ctx;
+ 
+-    sdom = sdap_domain_get(opts, root_domain);
++    sdom = sdap_domain_get(opts, domain);
+     if (sdom == NULL) {
+         DEBUG(SSSDBG_OP_FAILURE,
+-              "Cannot get the sdom for %s!\n", root_domain->name);
++              "Cannot get the sdom for %s!\n", domain->name);
+         return NULL;
+     }
+ 
+     if (sdom->pvt == NULL) {
+-        ret = ad_subdom_ad_ctx_new(be_ctx, ad_id_ctx, root_domain,
+-                                   &root_id_ctx);
++        ret = ad_subdom_ad_ctx_new(be_ctx, ad_id_ctx, domain,
++                                   &dom_id_ctx);
+         if (ret != EOK) {
+             DEBUG(SSSDBG_OP_FAILURE, "ad_subdom_ad_ctx_new failed.\n");
+             return NULL;
+         }
+ 
+-        sdom->pvt = root_id_ctx;
++        sdom->pvt = dom_id_ctx;
+     } else {
+-        root_id_ctx = sdom->pvt;
++        dom_id_ctx = sdom->pvt;
+     }
+ 
+-    root_id_ctx->ldap_ctx->ignore_mark_offline = true;
+-    return root_id_ctx;
++    dom_id_ctx->ldap_ctx->ignore_mark_offline = true;
++    return dom_id_ctx;
+ }
+ 
+ struct ad_get_root_domain_state {
+@@ -1403,9 +1403,9 @@ static void ad_get_root_domain_done(struct tevent_req *subreq)
+         goto done;
+     }
+ 
+-    state->root_id_ctx = ads_get_root_id_ctx(state->be_ctx,
+-                                             state->sd_ctx->ad_id_ctx,
+-                                             root_domain, state->opts);
++    state->root_id_ctx = ads_get_dom_id_ctx(state->be_ctx,
++                                            state->sd_ctx->ad_id_ctx,
++                                            root_domain, state->opts);
+     if (state->root_id_ctx == NULL) {
+         DEBUG(SSSDBG_OP_FAILURE, "Cannot create id ctx for the root domain\n");
+         ret = EFAULT;
+-- 
+2.21.3
+

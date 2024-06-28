@@ -1,0 +1,131 @@
+From 2499bd145f566bfd73b8c7e284b910dd2b36c6d1 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pavel=20B=C5=99ezina?= <pbrezina@redhat.com>
+Date: Fri, 15 Jan 2021 12:04:38 +0100
+Subject: [PATCH] cache_req: ignore autofs not configured error
+
+Otherwise we return ERR_OFFLINE for domains where autofs provider is not
+set (such as implicit files domain) which is undesirable.
+
+Steps to reproduce:
+1. Enable implicit files domains and LDAP domain with autofs configured
+2. Setup NFS server to export `/exports` with `/exports/home/test`
+3. Add autofs mount points:
+```
+dn: ou=mount,dc=ldap,dc=vm
+ou: mount
+objectClass: organizationalUnit
+objectClass: top
+
+dn: nisMapName=auto.master,ou=mount,dc=ldap,dc=vm
+objectClass: nisMap
+objectClass: top
+nisMapName: auto.master
+
+dn: cn=/export/home,nisMapName=auto.master,ou=mount,dc=ldap,dc=vm
+objectClass: nisObject
+objectClass: top
+cn: /export/home
+nisMapEntry: auto.home
+nisMapName: auto.master
+
+dn: nisMapName=auto.home,ou=mount,dc=ldap,dc=vm
+objectClass: nisMap
+objectClass: top
+nisMapName: auto.home
+
+dn: cn=/,nisMapName=auto.home,ou=mount,dc=ldap,dc=vm
+objectClass: nisObject
+objectClass: top
+cn: /
+nisMapEntry: -fstype=nfs,rw master.ldap.vm:/export/home/&
+nisMapName: auto.home
+```
+4. Run SSSD and autofs
+5. cd to /exports/home/test
+
+The directory will not be mounted with the new autofs protocol. It
+will succeed with the old protocol. In both versions, you'll see
+that SSSD returned ERR_OFFLINE:
+
+```
+(2021-01-15 11:44:48): [be[implicit_files]] [sbus_issue_request_done] (0x0040): sssd.DataProvider.Autofs.GetEntry: Error [1432158215]: DP target is not configured
+...
+(2021-01-15 11:44:49): [autofs] [cache_req_search_cache] (0x0400): CR #3: Looking up [auto.home:test] in cache
+(2021-01-15 11:44:49): [autofs] [cache_req_search_cache] (0x0400): CR #3: Object [auto.home:test] was not found in cache
+(2021-01-15 11:44:49): [autofs] [cache_req_search_ncache_add_to_domain] (0x2000): CR #3: This request type does not support negative cache
+(2021-01-15 11:44:49): [autofs] [cache_req_process_result] (0x0400): CR #3: Finished: Error 1432158212: SSSD is offline
+```
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ .../cache_req/plugins/cache_req_autofs_entry_by_name.c | 10 +++++++++-
+ .../cache_req/plugins/cache_req_autofs_map_by_name.c   | 10 +++++++++-
+ .../cache_req/plugins/cache_req_autofs_map_entries.c   | 10 +++++++++-
+ 3 files changed, 27 insertions(+), 3 deletions(-)
+
+diff --git a/src/responder/common/cache_req/plugins/cache_req_autofs_entry_by_name.c b/src/responder/common/cache_req/plugins/cache_req_autofs_entry_by_name.c
+index cd2085187..f411fd351 100644
+--- a/src/responder/common/cache_req/plugins/cache_req_autofs_entry_by_name.c
++++ b/src/responder/common/cache_req/plugins/cache_req_autofs_entry_by_name.c
+@@ -92,7 +92,15 @@ bool
+ cache_req_autofs_entry_by_name_dp_recv(struct tevent_req *subreq,
+                                        struct cache_req *cr)
+ {
+-    return sbus_call_dp_autofs_GetEntry_recv(subreq) == EOK;
++    errno_t ret;
++
++    ret = sbus_call_dp_autofs_GetEntry_recv(subreq);
++
++    if (ret == ERR_MISSING_DP_TARGET) {
++        ret = EOK;
++    }
++
++    return ret == EOK;
+ }
+ 
+ const struct cache_req_plugin cache_req_autofs_entry_by_name = {
+diff --git a/src/responder/common/cache_req/plugins/cache_req_autofs_map_by_name.c b/src/responder/common/cache_req/plugins/cache_req_autofs_map_by_name.c
+index 9d9bc3a97..c22cf0c8e 100644
+--- a/src/responder/common/cache_req/plugins/cache_req_autofs_map_by_name.c
++++ b/src/responder/common/cache_req/plugins/cache_req_autofs_map_by_name.c
+@@ -88,7 +88,15 @@ bool
+ cache_req_autofs_map_by_name_dp_recv(struct tevent_req *subreq,
+                                      struct cache_req *cr)
+ {
+-    return sbus_call_dp_autofs_GetMap_recv(subreq) == EOK;
++    errno_t ret;
++
++    ret = sbus_call_dp_autofs_GetMap_recv(subreq);
++
++    if (ret == ERR_MISSING_DP_TARGET) {
++        ret = EOK;
++    }
++
++    return ret == EOK;
+ }
+ 
+ const struct cache_req_plugin cache_req_autofs_map_by_name = {
+diff --git a/src/responder/common/cache_req/plugins/cache_req_autofs_map_entries.c b/src/responder/common/cache_req/plugins/cache_req_autofs_map_entries.c
+index ee0156b6a..4d9db6595 100644
+--- a/src/responder/common/cache_req/plugins/cache_req_autofs_map_entries.c
++++ b/src/responder/common/cache_req/plugins/cache_req_autofs_map_entries.c
+@@ -120,7 +120,15 @@ bool
+ cache_req_autofs_map_entries_dp_recv(struct tevent_req *subreq,
+                                      struct cache_req *cr)
+ {
+-    return sbus_call_dp_autofs_Enumerate_recv(subreq) == EOK;
++    errno_t ret;
++
++    ret = sbus_call_dp_autofs_Enumerate_recv(subreq);
++
++    if (ret == ERR_MISSING_DP_TARGET) {
++        ret = EOK;
++    }
++
++    return ret == EOK;
+ }
+ 
+ const struct cache_req_plugin cache_req_autofs_map_entries = {
+-- 
+2.21.3
+

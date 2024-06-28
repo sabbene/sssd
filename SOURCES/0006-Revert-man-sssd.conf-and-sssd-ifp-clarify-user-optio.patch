@@ -1,0 +1,62 @@
+From 3c6218aa91026e066e793ee26333ea64fd6bc50e Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Mon, 11 Apr 2022 22:49:30 +0200
+Subject: [PATCH 6/6] Revert "man: sssd.conf and sssd-ifp clarify user option"
+
+This reverts commit 3d25724dc63dffb6d734790e58b1647e3a64e84f.
+
+Reviewed-by: Iker Pedrosa <ipedrosa@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+---
+ src/man/sssd-ifp.5.xml  |  5 -----
+ src/man/sssd.conf.5.xml | 11 -----------
+ 2 files changed, 16 deletions(-)
+
+diff --git a/src/man/sssd-ifp.5.xml b/src/man/sssd-ifp.5.xml
+index d3080537a..1c35d58a8 100644
+--- a/src/man/sssd-ifp.5.xml
++++ b/src/man/sssd-ifp.5.xml
+@@ -71,11 +71,6 @@
+                             responder. User names are resolved to UIDs at
+                             startup.
+                         </para>
+-                        <para>
+-                            Local user names are required, i.e. accessible via
+-                            <quote>files</quote> service of
+-                            <filename>nsswitch.conf</filename>.
+-                        </para>
+                         <para>
+                             Default: 0 (only the root user is allowed to access
+                             the InfoPipe responder)
+diff --git a/src/man/sssd.conf.5.xml b/src/man/sssd.conf.5.xml
+index b6c5912f9..1b8ea7398 100644
+--- a/src/man/sssd.conf.5.xml
++++ b/src/man/sssd.conf.5.xml
+@@ -423,12 +423,6 @@
+                                     responder.
+                                 </phrase>
+                             </para>
+-                            <para>
+-                                Both a user name and a uid can be used but the
+-                                user should be a local one, i.e. accessible via
+-                                <quote>files</quote> service of
+-                                <filename>nsswitch.conf</filename>.
+-                            </para>
+                             <para>
+                                 Default: not set, process will run as root
+                             </para>
+@@ -2168,11 +2162,6 @@ pam_gssapi_indicators_map = sudo:pkinit, sudo-i:pkinit
+                             responder. User names are resolved to UIDs at
+                             startup.
+                         </para>
+-                        <para>
+-                            Local user names are required, i.e. accessible via
+-                            <quote>files</quote> service of
+-                            <filename>nsswitch.conf</filename>.
+-                        </para>
+                         <para>
+                             Default: 0 (only the root user is allowed to access
+                             the PAC responder)
+-- 
+2.26.3
+

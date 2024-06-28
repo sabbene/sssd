@@ -1,0 +1,53 @@
+From 1fd7a5ecb46a02a29ebf42039575b5344307bfbb Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Wed, 8 Feb 2023 18:58:37 +0100
+Subject: [PATCH 4/4] PAM_SSS: close(sss_cli_sd) should also be protected with
+ mutex. Otherwise a thread calling pam_end() can close socket mid pam
+ transaction in another thread.
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Bug only manifested on platforms where "lockfree client"
+feature wasn't built.
+
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+(cherry picked from commit bf3f73ea0ee123fe4e7c4bdd2287ac5a5e6d9082)
+---
+ src/sss_client/pam_sss.c     | 3 +++
+ src/sss_client/pam_sss_gss.c | 2 ++
+ 2 files changed, 5 insertions(+)
+
+diff --git a/src/sss_client/pam_sss.c b/src/sss_client/pam_sss.c
+index afbdef59a..39ad17188 100644
+--- a/src/sss_client/pam_sss.c
++++ b/src/sss_client/pam_sss.c
+@@ -117,7 +117,10 @@ static void close_fd(pam_handle_t *pamh, void *ptr, int err)
+ #endif /* PAM_DATA_REPLACE */
+ 
+     D(("Closing the fd"));
++
++    sss_pam_lock();
+     sss_cli_close_socket();
++    sss_pam_unlock();
+ }
+ 
+ struct cert_auth_info {
+diff --git a/src/sss_client/pam_sss_gss.c b/src/sss_client/pam_sss_gss.c
+index 1109ec570..dd578ae5d 100644
+--- a/src/sss_client/pam_sss_gss.c
++++ b/src/sss_client/pam_sss_gss.c
+@@ -581,7 +581,9 @@ int pam_sm_authenticate(pam_handle_t *pamh,
+     }
+ 
+ done:
++    sss_pam_lock();
+     sss_cli_close_socket();
++    sss_pam_unlock();
+     free(username);
+     free(domain);
+     free(target);
+-- 
+2.37.3
+

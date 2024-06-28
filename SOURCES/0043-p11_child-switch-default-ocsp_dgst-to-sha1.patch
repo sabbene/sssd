@@ -1,0 +1,77 @@
+From 10366b4ee8c01ea20d908102e92d52fdeda168c3 Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Tue, 18 Aug 2020 14:37:04 +0200
+Subject: [PATCH] p11_child: switch default ocsp_dgst to sha1
+
+For details please see discussion at
+https://github.com/SSSD/sssd/pull/837#issuecomment-672831519
+
+:newdefault: sssd:certificate_verification:ocsp_dgst, sha256, sha1
+
+Resolves:
+https://github.com/SSSD/sssd/issues/5002
+
+Reviewed-by: Iker Pedrosa <ipedrosa@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+---
+ src/man/sssd.conf.5.xml                | 3 ++-
+ src/p11_child/p11_child_common_utils.c | 6 +++---
+ src/p11_child/p11_child_openssl.c      | 4 ++--
+ 3 files changed, 7 insertions(+), 6 deletions(-)
+
+diff --git a/src/man/sssd.conf.5.xml b/src/man/sssd.conf.5.xml
+index 874a09c49..50692dfdd 100644
+--- a/src/man/sssd.conf.5.xml
++++ b/src/man/sssd.conf.5.xml
+@@ -507,7 +507,8 @@
+                                           <listitem><para>sha512</para></listitem>
+                                         </itemizedlist></para>
+                                         <para>
+-                                            Default: sha256
++                                            Default: sha1 (to allow compatibility with
++                                            RFC5019-compliant responder)
+                                         </para>
+                                         <para>(NSS Version) This option is
+                                         ignored, because NSS uses sha1
+diff --git a/src/p11_child/p11_child_common_utils.c b/src/p11_child/p11_child_common_utils.c
+index 6798752c7..95791b1f0 100644
+--- a/src/p11_child/p11_child_common_utils.c
++++ b/src/p11_child/p11_child_common_utils.c
+@@ -43,7 +43,7 @@ static struct cert_verify_opts *init_cert_verify_opts(TALLOC_CTX *mem_ctx)
+     cert_verify_opts->ocsp_default_responder = NULL;
+     cert_verify_opts->ocsp_default_responder_signing_cert = NULL;
+     cert_verify_opts->crl_file = NULL;
+-    cert_verify_opts->ocsp_dgst = CKM_SHA256;
++    cert_verify_opts->ocsp_dgst = CKM_SHA_1;
+     cert_verify_opts->soft_ocsp = false;
+     cert_verify_opts->soft_crl = false;
+ 
+@@ -174,8 +174,8 @@ errno_t parse_cert_verify_opts(TALLOC_CTX *mem_ctx, const char *verify_opts,
+             } else {
+                 DEBUG(SSSDBG_CRIT_FAILURE,
+                       "Unsupported digest for OCSP [%s], "
+-                      "using default sha256.\n", &opts[c][OCSP_DGST_LEN]);
+-                cert_verify_opts->ocsp_dgst = CKM_SHA256;
++                      "using default sha1.\n", &opts[c][OCSP_DGST_LEN]);
++                cert_verify_opts->ocsp_dgst = CKM_SHA_1;
+             }
+ #endif
+         } else if (strcasecmp(opts[c], "soft_ocsp") == 0) {
+diff --git a/src/p11_child/p11_child_openssl.c b/src/p11_child/p11_child_openssl.c
+index 321cf162e..04b3e1467 100644
+--- a/src/p11_child/p11_child_openssl.c
++++ b/src/p11_child/p11_child_openssl.c
+@@ -372,8 +372,8 @@ static errno_t do_ocsp(struct p11_ctx *p11_ctx, X509 *cert)
+     ocsp_dgst = get_dgst(p11_ctx->cert_verify_opts->ocsp_dgst);
+     if (ocsp_dgst == NULL) {
+         DEBUG(SSSDBG_OP_FAILURE, "Cannot determine configured digest function "
+-                                 "for OCSP, using default sha256.\n");
+-        ocsp_dgst = EVP_sha256();
++                                 "for OCSP, using default sha1.\n");
++        ocsp_dgst = EVP_sha1();
+     }
+     cid = OCSP_cert_to_id(ocsp_dgst, cert, issuer);
+     if (cid == NULL) {
+-- 
+2.21.3
+

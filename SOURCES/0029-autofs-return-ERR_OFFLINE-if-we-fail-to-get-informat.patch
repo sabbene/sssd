@@ -1,0 +1,58 @@
+From e50258da70b67ff1b0f928e2e7875bc2fa32dfde Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pavel=20B=C5=99ezina?= <pbrezina@redhat.com>
+Date: Fri, 6 Mar 2020 13:12:46 +0100
+Subject: [PATCH 14/18] autofs: return ERR_OFFLINE if we fail to get
+ information from backend and cache is empty
+
+Resolves:
+https://github.com/SSSD/sssd/issues/3413
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ .../common/cache_req/plugins/cache_req_autofs_entry_by_name.c   | 2 ++
+ .../common/cache_req/plugins/cache_req_autofs_map_by_name.c     | 2 ++
+ .../common/cache_req/plugins/cache_req_autofs_map_entries.c     | 2 ++
+ 3 files changed, 6 insertions(+)
+
+diff --git a/src/responder/common/cache_req/plugins/cache_req_autofs_entry_by_name.c b/src/responder/common/cache_req/plugins/cache_req_autofs_entry_by_name.c
+index cb674add6..55c9fc8b0 100644
+--- a/src/responder/common/cache_req/plugins/cache_req_autofs_entry_by_name.c
++++ b/src/responder/common/cache_req/plugins/cache_req_autofs_entry_by_name.c
+@@ -142,6 +142,8 @@ cache_req_autofs_entry_by_name_send(TALLOC_CTX *mem_ctx,
+         return NULL;
+     }
+ 
++    cache_req_data_set_propogate_offline_status(data, true);
++
+     return cache_req_steal_data_and_send(mem_ctx, ev, rctx, ncache,
+                                          cache_refresh_percent,
+                                          CACHE_REQ_POSIX_DOM, domain,
+diff --git a/src/responder/common/cache_req/plugins/cache_req_autofs_map_by_name.c b/src/responder/common/cache_req/plugins/cache_req_autofs_map_by_name.c
+index 3c08eaf4f..823eb3595 100644
+--- a/src/responder/common/cache_req/plugins/cache_req_autofs_map_by_name.c
++++ b/src/responder/common/cache_req/plugins/cache_req_autofs_map_by_name.c
+@@ -136,6 +136,8 @@ cache_req_autofs_map_by_name_send(TALLOC_CTX *mem_ctx,
+         return NULL;
+     }
+ 
++    cache_req_data_set_propogate_offline_status(data, true);
++
+     return cache_req_steal_data_and_send(mem_ctx, ev, rctx, ncache,
+                                          cache_refresh_percent,
+                                          CACHE_REQ_POSIX_DOM, domain,
+diff --git a/src/responder/common/cache_req/plugins/cache_req_autofs_map_entries.c b/src/responder/common/cache_req/plugins/cache_req_autofs_map_entries.c
+index 1b5645fa0..3e47b1321 100644
+--- a/src/responder/common/cache_req/plugins/cache_req_autofs_map_entries.c
++++ b/src/responder/common/cache_req/plugins/cache_req_autofs_map_entries.c
+@@ -168,6 +168,8 @@ cache_req_autofs_map_entries_send(TALLOC_CTX *mem_ctx,
+         return NULL;
+     }
+ 
++    cache_req_data_set_propogate_offline_status(data, true);
++
+     return cache_req_steal_data_and_send(mem_ctx, ev, rctx, ncache,
+                                          cache_refresh_percent,
+                                          CACHE_REQ_POSIX_DOM, domain,
+-- 
+2.21.3
+

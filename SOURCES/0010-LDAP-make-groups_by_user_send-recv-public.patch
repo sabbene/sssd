@@ -1,0 +1,73 @@
+From 936b828161810bef53525d72291cf029ad3ce317 Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Fri, 3 Nov 2023 18:43:13 +0100
+Subject: [PATCH 10/13] LDAP: make groups_by_user_send/recv public
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Resolves: https://github.com/SSSD/sssd/issues/5708
+
+Reviewed-by: Justin Stephenson <jstephen@redhat.com>
+Reviewed-by: Tomáš Halman <thalman@redhat.com>
+(cherry picked from commit 9b73614c49aeb3cfc3208dba5f472354086180b5)
+---
+ src/providers/ldap/ldap_common.h | 12 ++++++++++++
+ src/providers/ldap/ldap_id.c     | 18 +++++++++---------
+ 2 files changed, 21 insertions(+), 9 deletions(-)
+
+diff --git a/src/providers/ldap/ldap_common.h b/src/providers/ldap/ldap_common.h
+index 1b35cbd20..6df7b3df4 100644
+--- a/src/providers/ldap/ldap_common.h
++++ b/src/providers/ldap/ldap_common.h
+@@ -298,6 +298,18 @@ struct tevent_req *groups_get_send(TALLOC_CTX *memctx,
+                                    bool no_members);
+ int groups_get_recv(struct tevent_req *req, int *dp_error_out, int *sdap_ret);
+ 
++struct tevent_req *groups_by_user_send(TALLOC_CTX *memctx,
++                                       struct tevent_context *ev,
++                                       struct sdap_id_ctx *ctx,
++                                       struct sdap_domain *sdom,
++                                       struct sdap_id_conn_ctx *conn,
++                                       const char *filter_value,
++                                       int filter_type,
++                                       const char *extra_value,
++                                       bool noexist_delete);
++
++int groups_by_user_recv(struct tevent_req *req, int *dp_error_out, int *sdap_ret);
++
+ struct tevent_req *ldap_netgroup_get_send(TALLOC_CTX *memctx,
+                                           struct tevent_context *ev,
+                                           struct sdap_id_ctx *ctx,
+diff --git a/src/providers/ldap/ldap_id.c b/src/providers/ldap/ldap_id.c
+index a60aed068..fb81a1793 100644
+--- a/src/providers/ldap/ldap_id.c
++++ b/src/providers/ldap/ldap_id.c
+@@ -1151,15 +1151,15 @@ static int groups_by_user_retry(struct tevent_req *req);
+ static void groups_by_user_connect_done(struct tevent_req *subreq);
+ static void groups_by_user_done(struct tevent_req *subreq);
+ 
+-static struct tevent_req *groups_by_user_send(TALLOC_CTX *memctx,
+-                                              struct tevent_context *ev,
+-                                              struct sdap_id_ctx *ctx,
+-                                              struct sdap_domain *sdom,
+-                                              struct sdap_id_conn_ctx *conn,
+-                                              const char *filter_value,
+-                                              int filter_type,
+-                                              const char *extra_value,
+-                                              bool noexist_delete)
++struct tevent_req *groups_by_user_send(TALLOC_CTX *memctx,
++                                       struct tevent_context *ev,
++                                       struct sdap_id_ctx *ctx,
++                                       struct sdap_domain *sdom,
++                                       struct sdap_id_conn_ctx *conn,
++                                       const char *filter_value,
++                                       int filter_type,
++                                       const char *extra_value,
++                                       bool noexist_delete)
+ {
+     struct tevent_req *req;
+     struct groups_by_user_state *state;
+-- 
+2.41.0
+

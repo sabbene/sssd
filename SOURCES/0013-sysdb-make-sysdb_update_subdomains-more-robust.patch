@@ -1,0 +1,58 @@
+From 8ca799ea968e548337acb0300642a0d88f1bba9b Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Thu, 7 May 2020 15:47:35 +0200
+Subject: [PATCH 13/19] sysdb: make sysdb_update_subdomains() more robust
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Some NULL checks are added basically to allow that missing values can be
+set later.
+
+Resolves: https://github.com/SSSD/sssd/issues/5151
+
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+---
+ src/db/sysdb_subdomains.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/src/db/sysdb_subdomains.c b/src/db/sysdb_subdomains.c
+index b170d1978..d256817a6 100644
+--- a/src/db/sysdb_subdomains.c
++++ b/src/db/sysdb_subdomains.c
+@@ -421,7 +421,9 @@ errno_t sysdb_update_subdomains(struct sss_domain_info *domain,
+                 }
+ 
+                 /* in theory these may change, but it should never happen */
+-                if (strcasecmp(dom->realm, realm) != 0) {
++                if ((dom->realm == NULL && realm != NULL)
++                        || (dom->realm != NULL && realm != NULL
++                            && strcasecmp(dom->realm, realm) != 0)) {
+                     DEBUG(SSSDBG_TRACE_INTERNAL,
+                           "Realm name changed from [%s] to [%s]!\n",
+                            dom->realm, realm);
+@@ -432,7 +434,9 @@ errno_t sysdb_update_subdomains(struct sss_domain_info *domain,
+                         goto done;
+                     }
+                 }
+-                if (strcasecmp(dom->flat_name, flat) != 0) {
++                if ((dom->flat_name == NULL && flat != NULL)
++                        || (dom->flat_name != NULL && flat != NULL
++                            && strcasecmp(dom->flat_name, flat) != 0)) {
+                     DEBUG(SSSDBG_TRACE_INTERNAL,
+                           "Flat name changed from [%s] to [%s]!\n",
+                            dom->flat_name, flat);
+@@ -443,7 +447,9 @@ errno_t sysdb_update_subdomains(struct sss_domain_info *domain,
+                         goto done;
+                     }
+                 }
+-                if (strcasecmp(dom->domain_id, id) != 0) {
++                if ((dom->domain_id == NULL && id != NULL)
++                        || (dom->domain_id != NULL && id != NULL
++                            && strcasecmp(dom->domain_id, id) != 0)) {
+                     DEBUG(SSSDBG_TRACE_INTERNAL,
+                           "Domain changed from [%s] to [%s]!\n",
+                            dom->domain_id, id);
+-- 
+2.21.3
+

@@ -1,0 +1,124 @@
+From 72132c413a2b19fbc21120ce51698978fd926360 Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Tue, 20 Sep 2022 15:37:01 +0200
+Subject: [PATCH] krb5: respect krb5_validate for PAC checks
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The first step of checking the PAC is the same as during the Kerberos
+ticket validation, requesting a service ticket for a service principal
+from the local keytab. By default ticket validation is enable for the
+IPA and AD provider where checking the PAC might become important. If
+ticket validation is disabled manually it is most probably because there
+are issues requesting the service ticket and fixing those is currently
+not possible.
+
+Currently when SSSD is configured to check the PAC it ignores the
+krb5_validate setting and tries to request a service ticket which would
+fail in the case ticket validation is disabled for a reason. To not
+cause regressions with this patch SSSD will skip the PAC checks if
+ticket validation is disabled.
+
+Resolves: https://github.com/SSSD/sssd/issues/6355
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+Reviewed-by: Tomáš Halman <thalman@redhat.com>
+(cherry picked from commit f4dffaeaef16f146fc03970f62761fc335a3c7cc)
+---
+ src/man/include/krb5_options.xml      | 11 ++++++++++-
+ src/man/sssd.conf.5.xml               | 13 ++++++++++---
+ src/providers/krb5/krb5_child.c       |  9 ++++-----
+ src/providers/krb5/krb5_init_shared.c | 10 ++++++++++
+ 4 files changed, 34 insertions(+), 9 deletions(-)
+
+diff --git a/src/man/include/krb5_options.xml b/src/man/include/krb5_options.xml
+index c3292d1bb..d82be7bfa 100644
+--- a/src/man/include/krb5_options.xml
++++ b/src/man/include/krb5_options.xml
+@@ -26,7 +26,16 @@
+                 keytab entry as the last entry or the only entry in the keytab file.
+             </para>
+             <para>
+-                Default: false
++                Default: false (IPA and AD provider: true)
++            </para>
++            <para>
++                Please note that the ticket validation is the first step when
++		checking the PAC (see 'pac_check' in the
++                <citerefentry>
++                    <refentrytitle>sssd.conf</refentrytitle>
++                    <manvolnum>5</manvolnum>
++                </citerefentry> manual page for details). If ticket
++                validation is disabled the PAC checks will be skipped as well.
+             </para>
+         </listitem>
+     </varlistentry>
+diff --git a/src/man/sssd.conf.5.xml b/src/man/sssd.conf.5.xml
+index 615b41550..7a9920815 100644
+--- a/src/man/sssd.conf.5.xml
++++ b/src/man/sssd.conf.5.xml
+@@ -2238,9 +2238,16 @@ pam_gssapi_indicators_map = sudo:pkinit, sudo-i:pkinit
+                         <para>
+                             Apply additional checks on the PAC of the Kerberos
+                             ticket which is available in Active Directory and
+-                            FreeIPA domains, if configured. The following
+-                            options can be used alone or in a comma-separated
+-                            list:
++                            FreeIPA domains, if configured. Please note that
++			    Kerberos ticket validation must be enabled to be
++                            able to check the PAC, i.e. the krb5_validate option
++                            must be set to 'True' which is the default for the
++                            IPA and AD provider. If krb5_validate is set to
++                            'False' the PAC checks will be skipped.
++			</para>
++                        <para>
++			    The following options can be used alone or in a
++			    comma-separated list:
+                             <variablelist>
+                             <varlistentry>
+                                 <term>no_check</term>
+diff --git a/src/providers/krb5/krb5_child.c b/src/providers/krb5/krb5_child.c
+index 0a592da00..8727b4202 100644
+--- a/src/providers/krb5/krb5_child.c
++++ b/src/providers/krb5/krb5_child.c
+@@ -3866,11 +3866,10 @@ int main(int argc, const char *argv[])
+         goto done;
+     }
+ 
+-    /* To be able to read the PAC we have to request a service ticket where we
+-     * have a key to decrypt it, this is the same step we use for validating
+-     * the ticket. */
+-    if (cli_opts.check_pac_flags != 0) {
+-        kr->validate = true;
++    if (cli_opts.check_pac_flags != 0 && !kr->validate) {
++        DEBUG(SSSDBG_IMPORTANT_INFO,
++              "PAC check is requested but krb5_validate is set to false. "
++              "PAC checks will be skipped.\n");
+     }
+ 
+     kerr = privileged_krb5_setup(kr, offline);
+diff --git a/src/providers/krb5/krb5_init_shared.c b/src/providers/krb5/krb5_init_shared.c
+index ee48f459b..3e6ebe2ed 100644
+--- a/src/providers/krb5/krb5_init_shared.c
++++ b/src/providers/krb5/krb5_init_shared.c
+@@ -77,6 +77,16 @@ errno_t krb5_child_init(struct krb5_ctx *krb5_auth_ctx,
+         goto done;
+     }
+ 
++    if (krb5_auth_ctx->check_pac_flags != 0
++            && !dp_opt_get_bool(krb5_auth_ctx->opts, KRB5_VALIDATE)) {
++        DEBUG(SSSDBG_IMPORTANT_INFO,
++              "PAC check is requested but krb5_validate is set to false. "
++              "PAC checks will be skipped.\n");
++        sss_log(SSS_LOG_WARNING,
++                "PAC check is requested but krb5_validate is set to false. "
++                "PAC checks will be skipped.");
++    }
++
+     ret = parse_krb5_map_user(krb5_auth_ctx,
+                               dp_opt_get_cstring(krb5_auth_ctx->opts,
+                                                  KRB5_MAP_USER),
+-- 
+2.37.3
+

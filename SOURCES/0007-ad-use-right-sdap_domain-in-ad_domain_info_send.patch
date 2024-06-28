@@ -1,0 +1,175 @@
+From 51e92297157562511baf8902777f02a4aa2e70e6 Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Tue, 15 Mar 2022 11:36:45 +0100
+Subject: [PATCH] ad: use right sdap_domain in ad_domain_info_send
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Originally ad_domain_info_send() was only called when there was only a
+single domain available and hence only a single sdap_domain struct with
+the search bases in the sdap_domain list. Since ad_domain_info_send() is
+now called at other times as well the right sdap_domain struct must be
+selected so that the right search bases are used.
+
+Resolves: https://github.com/SSSD/sssd/issues/6063
+
+Reviewed-by: Iker Pedrosa <ipedrosa@redhat.com>
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+---
+ src/providers/ad/ad_domain_info.c    | 10 +++++-
+ src/providers/ldap/ldap_common.h     |  3 ++
+ src/providers/ldap/sdap_domain.c     | 21 ++++++++++++
+ src/tests/cmocka/test_search_bases.c | 48 +++++++++++++++++++++++++++-
+ 4 files changed, 80 insertions(+), 2 deletions(-)
+
+diff --git a/src/providers/ad/ad_domain_info.c b/src/providers/ad/ad_domain_info.c
+index 52b2e2442..f3a82a198 100644
+--- a/src/providers/ad/ad_domain_info.c
++++ b/src/providers/ad/ad_domain_info.c
+@@ -181,6 +181,7 @@ struct ad_domain_info_state {
+     struct sdap_id_op *id_op;
+     struct sdap_id_ctx *id_ctx;
+     struct sdap_options *opts;
++    struct sdap_domain *sdom;
+ 
+     const char *dom_name;
+     int base_iter;
+@@ -215,6 +216,13 @@ ad_domain_info_send(TALLOC_CTX *mem_ctx,
+     state->id_ctx = conn->id_ctx;
+     state->opts = conn->id_ctx->opts;
+     state->dom_name = dom_name;
++    state->sdom = sdap_domain_get_by_name(state->opts, state->dom_name);
++    if (state->sdom == NULL || state->sdom->search_bases == NULL) {
++        DEBUG(SSSDBG_OP_FAILURE, "Missing internal domain data.\n");
++        ret = EINVAL;
++        goto immediate;
++    }
++
+ 
+     ret = ad_domain_info_next(req);
+     if (ret != EOK && ret != EAGAIN) {
+@@ -243,7 +251,7 @@ ad_domain_info_next(struct tevent_req *req)
+     struct ad_domain_info_state *state =
+         tevent_req_data(req, struct ad_domain_info_state);
+ 
+-    base = state->opts->sdom->search_bases[state->base_iter];
++    base = state->sdom->search_bases[state->base_iter];
+     if (base == NULL) {
+         return EOK;
+     }
+diff --git a/src/providers/ldap/ldap_common.h b/src/providers/ldap/ldap_common.h
+index c78338b5d..426ee68df 100644
+--- a/src/providers/ldap/ldap_common.h
++++ b/src/providers/ldap/ldap_common.h
+@@ -391,6 +391,9 @@ sdap_domain_remove(struct sdap_options *opts,
+ struct sdap_domain *sdap_domain_get(struct sdap_options *opts,
+                                     struct sss_domain_info *dom);
+ 
++struct sdap_domain *sdap_domain_get_by_name(struct sdap_options *opts,
++                                            const char *dom_name);
++
+ struct sdap_domain *sdap_domain_get_by_dn(struct sdap_options *opts,
+                                           const char *dn);
+ 
+diff --git a/src/providers/ldap/sdap_domain.c b/src/providers/ldap/sdap_domain.c
+index fa6e9340d..1785dd20d 100644
+--- a/src/providers/ldap/sdap_domain.c
++++ b/src/providers/ldap/sdap_domain.c
+@@ -44,6 +44,27 @@ sdap_domain_get(struct sdap_options *opts,
+     return sditer;
+ }
+ 
++struct sdap_domain *
++sdap_domain_get_by_name(struct sdap_options *opts,
++                        const char *dom_name)
++{
++    struct sdap_domain *sditer = NULL;
++
++    if (dom_name == NULL) {
++        DEBUG(SSSDBG_OP_FAILURE, "Missing domain name.\n");
++        return NULL;
++    }
++
++    DLIST_FOR_EACH(sditer, opts->sdom) {
++        if (sditer->dom->name != NULL
++                && strcasecmp(sditer->dom->name, dom_name) == 0) {
++            break;
++        }
++    }
++
++    return sditer;
++}
++
+ struct sdap_domain *
+ sdap_domain_get_by_dn(struct sdap_options *opts,
+                       const char *dn)
+diff --git a/src/tests/cmocka/test_search_bases.c b/src/tests/cmocka/test_search_bases.c
+index 109fa04bf..3276cf118 100644
+--- a/src/tests/cmocka/test_search_bases.c
++++ b/src/tests/cmocka/test_search_bases.c
+@@ -176,6 +176,51 @@ void test_get_by_dn_fail(void **state)
+     do_test_get_by_dn(dn, dns, 1, dns2, 1, DN_NOT_IN_DOMS);
+ }
+ 
++void test_sdap_domain_get_by_name(void **state)
++{
++    struct sdap_options *opts;
++    struct sss_domain_info dom1 = { 0 };
++    dom1.name  = discard_const("dom1");
++    struct sss_domain_info dom2 = { 0 };
++    dom2.name  = discard_const("dom2");
++    struct sss_domain_info dom3 = { 0 };
++    dom3.name  = discard_const("dom3");
++    int ret;
++    struct sdap_domain *sdom;
++
++    opts = talloc_zero(NULL, struct sdap_options);
++    assert_non_null(opts);
++
++    ret = sdap_domain_add(opts, &dom1, NULL);
++    assert_int_equal(ret, EOK);
++
++    ret = sdap_domain_add(opts, &dom2, NULL);
++    assert_int_equal(ret, EOK);
++
++    ret = sdap_domain_add(opts, &dom3, NULL);
++    assert_int_equal(ret, EOK);
++
++    sdom = sdap_domain_get_by_name(opts, NULL);
++    assert_null(sdom);
++
++    sdom = sdap_domain_get_by_name(opts, "abc");
++    assert_null(sdom);
++
++    sdom = sdap_domain_get_by_name(opts, "dom1");
++    assert_non_null(sdom);
++    assert_ptr_equal(sdom->dom, &dom1);
++
++    sdom = sdap_domain_get_by_name(opts, "dom2");
++    assert_non_null(sdom);
++    assert_ptr_equal(sdom->dom, &dom2);
++
++    sdom = sdap_domain_get_by_name(opts, "dom3");
++    assert_non_null(sdom);
++    assert_ptr_equal(sdom->dom, &dom3);
++
++    talloc_free(opts);
++}
++
+ int main(void)
+ {
+     const struct CMUnitTest tests[] = {
+@@ -183,7 +228,8 @@ int main(void)
+         cmocka_unit_test(test_search_bases_success),
+         cmocka_unit_test(test_get_by_dn_fail),
+         cmocka_unit_test(test_get_by_dn),
+-        cmocka_unit_test(test_get_by_dn2)
++        cmocka_unit_test(test_get_by_dn2),
++        cmocka_unit_test(test_sdap_domain_get_by_name)
+      };
+ 
+     return cmocka_run_group_tests(tests, NULL, NULL);
+-- 
+2.34.3
+

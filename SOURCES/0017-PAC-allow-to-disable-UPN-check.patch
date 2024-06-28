@@ -1,0 +1,49 @@
+From a86d1740167031bf6444ff821a201164c11ba09c Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Wed, 16 Nov 2022 09:28:54 +0100
+Subject: [PATCH 17/19] PAC: allow to disable UPN check
+
+Currently it was not possible to skip the UPN check which checks if the
+UPN in the PAC and the one stored in SSSD's cache are different.
+Additionally the related debug message will show both principals if they
+differ.
+
+Resolves: https://github.com/SSSD/sssd/issues/6451
+
+(cherry picked from commit 91789449b7a8b20056e1edfedd8f8cf92f7a0a2a)
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ src/providers/ad/ad_pac_common.c | 16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
+
+diff --git a/src/providers/ad/ad_pac_common.c b/src/providers/ad/ad_pac_common.c
+index 0ed817111..79f79b7a7 100644
+--- a/src/providers/ad/ad_pac_common.c
++++ b/src/providers/ad/ad_pac_common.c
+@@ -224,9 +224,19 @@ errno_t check_upn_and_sid_from_user_and_pac(struct ldb_message *msg,
+ 
+         if (user_data != NULL) {
+             if (strcasecmp(user_data, upn_dns_info->upn_name) != 0) {
+-                DEBUG(SSSDBG_CRIT_FAILURE,
+-                      "UPN of user entry and PAC do not match.\n");
+-                return ERR_CHECK_PAC_FAILED;
++                if (pac_check_opts & CHECK_PAC_CHECK_UPN) {
++                    DEBUG(SSSDBG_CRIT_FAILURE, "UPN of user entry [%s] and "
++                                               "PAC [%s] do not match.\n",
++                                               user_data,
++                                               upn_dns_info->upn_name);
++                    return ERR_CHECK_PAC_FAILED;
++                } else {
++                    DEBUG(SSSDBG_IMPORTANT_INFO, "UPN of user entry [%s] and "
++                                                 "PAC [%s] do not match, "
++                                                 "ignored.\n", user_data,
++                                                 upn_dns_info->upn_name);
++                    return EOK;
++                }
+             }
+         }
+ 
+-- 
+2.37.3
+

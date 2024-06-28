@@ -1,0 +1,43 @@
+From 89ea4a5feaf30f80a79ca3ba8166f304cc414e07 Mon Sep 17 00:00:00 2001
+From: Justin Stephenson <jstephen@redhat.com>
+Date: Tue, 15 Nov 2022 12:47:51 -0500
+Subject: [PATCH] Analyzer: Ensure parsed id contains digit
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+In analyzer list verbose output, we parse the last field of cache_req_search_send() lines.
+Certain log messages need to be filtered out by ensuring the parsed field is
+a digit, such as the last line below.
+
+[cache_req_search_send] (0x0400): [CID#1] CR #1: Looking up GID:1031401119@testrealm.test
+[cache_req_search_send] (0x0400): [CID#1] CR #1: Looking up GID:1031401119@testrealm.test
+[cache_req_search_send] (0x0400): [CID#1] CR #1: Looking up GID:1031401119@domain-zflo.com
+[cache_req_search_send] (0x0400): [CID#1] CR #1: Returning [GID:1031401119@domain-zflo.com] from cache
+
+Reviewed-by: Iker Pedrosa <ipedrosa@redhat.com>
+Reviewed-by: Tomáš Halman <thalman@redhat.com>
+(cherry picked from commit bfa8d50c479cf8ef7b299eb5848309a3a9ea7f12)
+
+Reviewed-by: Iker Pedrosa <ipedrosa@redhat.com>
+Reviewed-by: Tomáš Halman <thalman@redhat.com>
+---
+ src/tools/analyzer/modules/request.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/tools/analyzer/modules/request.py b/src/tools/analyzer/modules/request.py
+index 15c8e6bfb..bf279ea75 100644
+--- a/src/tools/analyzer/modules/request.py
++++ b/src/tools/analyzer/modules/request.py
+@@ -214,7 +214,7 @@ class RequestAnalyzer:
+                         print("       - " + name[:-1])
+                         cr_done.append(cr)
+                 if (id and ("UID" in cidline or "GID" in cidline)):
+-                    if id not in id_done:
++                    if id not in id_done and bool(re.search(r'\d', id)):
+                         print("       - " + id)
+                         id_done.append(id)
+ 
+-- 
+2.37.3
+

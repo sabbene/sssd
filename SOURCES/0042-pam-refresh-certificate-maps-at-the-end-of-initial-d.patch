@@ -1,0 +1,64 @@
+From cb936e92041d63f79a74c30bae8140c74a18dbc0 Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Wed, 20 Jan 2021 18:25:04 +0100
+Subject: [PATCH 42/42] pam: refresh certificate maps at the end of initial
+ domains lookup
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+During startup SSSD's responders send a getDomains request to all
+backends to refresh some domain related needed by the responders.
+
+The PAM responder specifically needs the certificate mapping and
+matching rules when Smartcard authentication is enable. Currently the
+rules are not refreshed at the end of the initial request but the code
+assumed that the related structures are initialized after the request
+finished.
+
+To avoid a race condition this patch adds a callback to the end of the
+request to make sure the rules are properly refreshed even if they are
+already initialized before.
+
+Resolves: https://github.com/SSSD/sssd/issues/5469
+
+Reviewed-by: Tomáš Halman <thalman@redhat.com>
+---
+ src/responder/pam/pamsrv.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/src/responder/pam/pamsrv.c b/src/responder/pam/pamsrv.c
+index 8b1ce2e92..65370662d 100644
+--- a/src/responder/pam/pamsrv.c
++++ b/src/responder/pam/pamsrv.c
+@@ -154,6 +154,18 @@ static errno_t get_app_services(struct pam_ctx *pctx)
+     return EOK;
+ }
+ 
++static void pam_get_domains_callback(void *pvt)
++{
++    struct pam_ctx *pctx;
++    int ret;
++
++    pctx = talloc_get_type(pvt, struct pam_ctx);
++    ret = p11_refresh_certmap_ctx(pctx, pctx->rctx->domains);
++    if (ret != EOK) {
++        DEBUG(SSSDBG_OP_FAILURE, "p11_refresh_certmap_ctx failed.\n");
++    }
++}
++
+ static int pam_process_init(TALLOC_CTX *mem_ctx,
+                             struct tevent_context *ev,
+                             struct confdb_ctx *cdb,
+@@ -247,7 +259,7 @@ static int pam_process_init(TALLOC_CTX *mem_ctx,
+     responder_set_fd_limit(fd_limit);
+ 
+     ret = schedule_get_domains_task(rctx, rctx->ev, rctx, pctx->rctx->ncache,
+-                                    NULL, NULL);
++                                    pam_get_domains_callback, pctx);
+     if (ret != EOK) {
+         DEBUG(SSSDBG_FATAL_FAILURE, "schedule_get_domains_tasks failed.\n");
+         goto done;
+-- 
+2.21.3
+

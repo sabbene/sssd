@@ -1,0 +1,44 @@
+From 8c642a542245a9f9fde5c2de9c96082b4c0d0963 Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Mon, 11 May 2020 21:26:13 +0200
+Subject: [PATCH 17/19] ad: remove unused trust_type from ad_subdom_store()
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Resolves: https://github.com/SSSD/sssd/issues/5151
+
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+---
+ src/providers/ad/ad_subdomains.c | 8 --------
+ 1 file changed, 8 deletions(-)
+
+diff --git a/src/providers/ad/ad_subdomains.c b/src/providers/ad/ad_subdomains.c
+index a9a552ff7..198f5c916 100644
+--- a/src/providers/ad/ad_subdomains.c
++++ b/src/providers/ad/ad_subdomains.c
+@@ -576,7 +576,6 @@ ad_subdom_store(struct confdb_ctx *cdb,
+     enum idmap_error_code err;
+     struct ldb_message_element *el;
+     char *sid_str = NULL;
+-    uint32_t trust_type;
+     enum sss_domain_mpg_mode mpg_mode;
+     enum sss_domain_mpg_mode default_mpg_mode;
+ 
+@@ -586,13 +585,6 @@ ad_subdom_store(struct confdb_ctx *cdb,
+         goto done;
+     }
+ 
+-    ret = sysdb_attrs_get_uint32_t(subdom_attrs, AD_AT_TRUST_TYPE,
+-                                   &trust_type);
+-    if (ret != EOK) {
+-        DEBUG(SSSDBG_OP_FAILURE, "sysdb_attrs_get_uint32_t failed.\n");
+-        goto done;
+-    }
+-
+     ret = sysdb_attrs_get_string(subdom_attrs, AD_AT_TRUST_PARTNER, &name);
+     if (ret != EOK) {
+         DEBUG(SSSDBG_OP_FAILURE, "failed to get subdomain name\n");
+-- 
+2.21.3
+

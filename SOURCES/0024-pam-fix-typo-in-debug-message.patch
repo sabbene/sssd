@@ -1,0 +1,27 @@
+From dcc42015f7ada1c4e4daed17e2c8087e29cb7616 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pavel=20B=C5=99ezina?= <pbrezina@redhat.com>
+Date: Thu, 1 Oct 2020 14:02:44 +0200
+Subject: [PATCH 24/27] pam: fix typo in debug message
+
+Reviewed-by: Robbie Harwood <rharwood@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+---
+ src/responder/pam/pamsrv_cmd.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/responder/pam/pamsrv_cmd.c b/src/responder/pam/pamsrv_cmd.c
+index 1d0251497..acbfc0c39 100644
+--- a/src/responder/pam/pamsrv_cmd.c
++++ b/src/responder/pam/pamsrv_cmd.c
+@@ -1941,7 +1941,7 @@ static void pam_check_user_search_next(struct tevent_req *req)
+     talloc_zfree(req);
+     if (ret != EOK && ret != ENOENT) {
+         DEBUG(SSSDBG_OP_FAILURE, "Cache lookup failed, trying to get fresh "
+-                                 "data from the backened.\n");
++                                 "data from the backend.\n");
+     }
+ 
+     DEBUG(SSSDBG_TRACE_ALL, "PAM initgroups scheme [%s].\n",
+-- 
+2.21.3
+

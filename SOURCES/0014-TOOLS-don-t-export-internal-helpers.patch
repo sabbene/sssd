@@ -1,0 +1,94 @@
+From 7e23e6394b518dd013c6b03a1a63715899180935 Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Sun, 6 Nov 2022 11:22:22 +0100
+Subject: [PATCH 14/16] TOOLS: don't export internal helpers
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Reviewed-by: Iker Pedrosa <ipedrosa@redhat.com>
+Reviewed-by: Justin Stephenson <jstephen@redhat.com>
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+(cherry picked from commit 6ef3aade0394e32540242f902c9f21bb8d6c41f2)
+
+Reviewed-by: Iker Pedrosa <ipedrosa@redhat.com>
+Reviewed-by: Justin Stephenson <jstephen@redhat.com>
+---
+ src/tools/common/sss_tools.c | 16 ++++++++--------
+ src/tools/common/sss_tools.h | 12 ------------
+ 2 files changed, 8 insertions(+), 20 deletions(-)
+
+diff --git a/src/tools/common/sss_tools.c b/src/tools/common/sss_tools.c
+index c066ddc5c..47b85bdd2 100644
+--- a/src/tools/common/sss_tools.c
++++ b/src/tools/common/sss_tools.c
+@@ -178,9 +178,9 @@ static errno_t sss_tool_domains_init(TALLOC_CTX *mem_ctx,
+     return ret;
+ }
+ 
+-errno_t sss_tool_init(TALLOC_CTX *mem_ctx,
+-                      int *argc, const char **argv,
+-                      struct sss_tool_ctx **_tool_ctx)
++static errno_t sss_tool_init(TALLOC_CTX *mem_ctx,
++                             int *argc, const char **argv,
++                             struct sss_tool_ctx **_tool_ctx)
+ {
+     struct sss_tool_ctx *tool_ctx;
+ 
+@@ -235,7 +235,7 @@ static size_t sss_tool_max_length(struct sss_route_cmd *commands)
+     return max;
+ }
+ 
+-void sss_tool_usage(const char *tool_name, struct sss_route_cmd *commands)
++static void sss_tool_usage(const char *tool_name, struct sss_route_cmd *commands)
+ {
+     int min_len;
+     int i;
+@@ -304,10 +304,10 @@ done:
+     return ret;
+ }
+ 
+-errno_t sss_tool_route(int argc, const char **argv,
+-                       struct sss_tool_ctx *tool_ctx,
+-                       struct sss_route_cmd *commands,
+-                       void *pvt)
++static errno_t sss_tool_route(int argc, const char **argv,
++                              struct sss_tool_ctx *tool_ctx,
++                              struct sss_route_cmd *commands,
++                              void *pvt)
+ {
+     struct sss_cmdline cmdline;
+     const char *cmd;
+diff --git a/src/tools/common/sss_tools.h b/src/tools/common/sss_tools.h
+index 0e4308ee6..578186633 100644
+--- a/src/tools/common/sss_tools.h
++++ b/src/tools/common/sss_tools.h
+@@ -35,10 +35,6 @@ struct sss_tool_ctx {
+     struct sss_domain_info *domains;
+ };
+ 
+-errno_t sss_tool_init(TALLOC_CTX *mem_ctx,
+-                      int *argc, const char **argv,
+-                      struct sss_tool_ctx **_tool_ctx);
+-
+ struct sss_cmdline {
+     const char *exec; /* argv[0] */
+     const char *command; /* command name */
+@@ -69,14 +65,6 @@ struct sss_route_cmd {
+     int flags;
+ };
+ 
+-void sss_tool_usage(const char *tool_name,
+-                    struct sss_route_cmd *commands);
+-
+-errno_t sss_tool_route(int argc, const char **argv,
+-                       struct sss_tool_ctx *tool_ctx,
+-                       struct sss_route_cmd *commands,
+-                       void *pvt);
+-
+ typedef errno_t (*sss_popt_fn)(poptContext pc, char option, void *pvt);
+ 
+ enum sss_tool_opt {
+-- 
+2.37.3
+

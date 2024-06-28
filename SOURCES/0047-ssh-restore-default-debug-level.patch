@@ -1,0 +1,49 @@
+From 2d26c95d78cf43798b54ac8c478b8a9ee41cab39 Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Wed, 3 Feb 2021 18:28:29 +0100
+Subject: [PATCH] ssh: restore default debug level
+
+The recent change of the default debug level for the main SSSD
+components affected the ssh helpers sss_ssh_authorizedkeys and
+sss_ssh_knownhostsproxy as well.
+
+To avoid any confusion about unexpected debug messages this patch
+restores to original value for the two helpers.
+
+Resolves: https://github.com/SSSD/sssd/issues/5488
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ src/sss_client/ssh/sss_ssh_authorizedkeys.c  | 2 +-
+ src/sss_client/ssh/sss_ssh_knownhostsproxy.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/sss_client/ssh/sss_ssh_authorizedkeys.c b/src/sss_client/ssh/sss_ssh_authorizedkeys.c
+index 8e80f9663..877c00299 100644
+--- a/src/sss_client/ssh/sss_ssh_authorizedkeys.c
++++ b/src/sss_client/ssh/sss_ssh_authorizedkeys.c
+@@ -32,7 +32,7 @@
+ int main(int argc, const char **argv)
+ {
+     TALLOC_CTX *mem_ctx = NULL;
+-    int pc_debug = SSSDBG_DEFAULT;
++    int pc_debug = SSSDBG_FATAL_FAILURE;
+     const char *pc_domain = NULL;
+     const char *pc_user = NULL;
+     struct poptOption long_options[] = {
+diff --git a/src/sss_client/ssh/sss_ssh_knownhostsproxy.c b/src/sss_client/ssh/sss_ssh_knownhostsproxy.c
+index ad6af81d8..1102fd4ab 100644
+--- a/src/sss_client/ssh/sss_ssh_knownhostsproxy.c
++++ b/src/sss_client/ssh/sss_ssh_knownhostsproxy.c
+@@ -174,7 +174,7 @@ connect_proxy_command(char **args)
+ int main(int argc, const char **argv)
+ {
+     TALLOC_CTX *mem_ctx = NULL;
+-    int pc_debug = SSSDBG_DEFAULT;
++    int pc_debug = SSSDBG_FATAL_FAILURE;
+     int pc_port = 22;
+     const char *pc_domain = NULL;
+     const char *pc_host = NULL;
+-- 
+2.21.3
+

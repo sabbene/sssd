@@ -1,0 +1,59 @@
+From 171b664ec4a7c94583b35597bd7e1e72bf89d217 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pawe=C5=82=20Po=C5=82awski?= <ppolawsk@redhat.com>
+Date: Wed, 2 Dec 2020 03:10:50 +0100
+Subject: [PATCH 18/18] data_provider_be: MAN page update
+
+Updated description of parameters:
+* offline_timeout
+* offline_timeout_max
+
+MAN page now explains that in some circumstances
+corelation of offline_timeout and offline_timeout_max values
+may lead to offline checking interval not incrementing.
+This is a false positive error as in fact the value
+just saturates almost instantly.
+
+Reviewed-by: Iker Pedrosa <ipedrosa@redhat.com>
+---
+ src/man/sssd.conf.5.xml | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/src/man/sssd.conf.5.xml b/src/man/sssd.conf.5.xml
+index d637e2eaa..8b330de58 100644
+--- a/src/man/sssd.conf.5.xml
++++ b/src/man/sssd.conf.5.xml
+@@ -739,12 +739,12 @@
+                              offline_timeout + random_offset
+                         </para>
+                         <para>
+-                            The random offset can increment up to 30 seconds.
++                            The random offset value is from 0 to 30.
+                             After each unsuccessful attempt to go online,
+                             the new interval is recalculated by the following:
+                         </para>
+                         <para>
+-                            new_interval = old_interval*2 + random_offset
++                            new_interval = (old_interval * 2) + random_offset
+                         </para>
+                         <para>
+                             Note that the maximum length of each interval
+@@ -769,6 +769,16 @@
+                         <para>
+                             A value of 0 disables the incrementing behaviour.
+                         </para>
++                        <para>
++                            The value of this parameter should be set in correlation
++                            to offline_timeout parameter value.
++                        </para>
++                        <para>
++                            With offline_timeout set to 60 (default value) there is no point
++                            in setting offlinet_timeout_max to less than 120 as it will
++                            saturate instantly. General rule here should be to set
++                            offline_timeout_max to at least 4 times offline_timeout.
++                        </para>
+                         <para>
+                             Although a value between 0 and offline_timeout may be
+                             specified, it has the effect of overriding the
+-- 
+2.21.3
+

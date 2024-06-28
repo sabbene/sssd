@@ -1,0 +1,58 @@
+From 80ffa314c669feaaffe487d8ea5004c149d948c8 Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Mon, 23 May 2022 09:05:43 +0200
+Subject: [PATCH] ad: add fallback in ad_domain_info_send()
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Commit 51e92297157562511baf8902777f02a4aa2e70e6 allowed
+ad_domain_info_send() to handle multiple domains by searching for the
+matching sdap_domain data. Unfortunately it assumed that the configured
+name and the DNS domain name are always matching. This is true for all
+sub-domains discovered at runtime by DNS lookups but might not be true
+for the domain configured in sssd.conf. Since the configured domain is
+the first in the list of sdap_domain data it will be used as a fallback
+in case no data could be found by name.
+
+Resolves: https://github.com/SSSD/sssd/issues/6170
+
+Reviewed-by: Iker Pedrosa <ipedrosa@redhat.com>
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+(cherry picked from commit 71b14474bec82a0c57065ad45915ebfeb9e3d03e)
+---
+ src/providers/ad/ad_domain_info.c | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/src/providers/ad/ad_domain_info.c b/src/providers/ad/ad_domain_info.c
+index f3a82a198..9583c74b9 100644
+--- a/src/providers/ad/ad_domain_info.c
++++ b/src/providers/ad/ad_domain_info.c
+@@ -217,8 +217,23 @@ ad_domain_info_send(TALLOC_CTX *mem_ctx,
+     state->opts = conn->id_ctx->opts;
+     state->dom_name = dom_name;
+     state->sdom = sdap_domain_get_by_name(state->opts, state->dom_name);
++    /* The first domain in the list is the domain configured in sssd.conf and
++     * here it might be possible that the domain name from the config file and
++     * the DNS domain name do not match. All other sub-domains are discovered
++     * at runtime with the help of DNS lookups so it is expected that the
++     * names matches. Hence it makes sense to fall back to the first entry in
++     * the list if no matching domain was found since it is most probably
++     * related to the configured domain. */
++    if (state->sdom == NULL) {
++        DEBUG(SSSDBG_OP_FAILURE, "No internal domain data found for [%s], "
++                                 "falling back to first domain.\n",
++                                 state->dom_name);
++        state->sdom = state->opts->sdom;
++    }
+     if (state->sdom == NULL || state->sdom->search_bases == NULL) {
+-        DEBUG(SSSDBG_OP_FAILURE, "Missing internal domain data.\n");
++        DEBUG(SSSDBG_OP_FAILURE,
++              "Missing internal domain data for domain [%s].\n",
++              state->dom_name);
+         ret = EINVAL;
+         goto immediate;
+     }
+-- 
+2.34.3
+

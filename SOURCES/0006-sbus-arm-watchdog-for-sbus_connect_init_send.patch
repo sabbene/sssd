@@ -1,0 +1,53 @@
+From 55564defec8fdbb4d9df6b0124a8b18b31743230 Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Fri, 9 Jun 2023 13:01:47 +0200
+Subject: [PATCH 6/6] sbus: arm watchdog for sbus_connect_init_send()
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+There seem to be conditions where the reply in the
+sbus_call_DBus_Hello_send() request gets lost and the backend cannot
+properly initialize its sbus/DBus server. Since the backend cannot be
+connected by the frontends in this state the best way to recover would
+be a restart. Since the event-loop is active in this state, e.g. waiting
+for the reply, the watchdog will not consider the process as hung and
+will not restart the process.
+
+To make the watchdog handle this case arm_watchdog() and
+disarm_watchdog() are called before and after the request, respectively.
+
+Resolves: https://github.com/SSSD/sssd/issues/6803
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+(cherry picked from commit cca9361d92501e0be34d264d370fe897a0c970af)
+---
+ src/sbus/connection/sbus_connection_connect.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/sbus/connection/sbus_connection_connect.c b/src/sbus/connection/sbus_connection_connect.c
+index 45a0fa491..edc090e15 100644
+--- a/src/sbus/connection/sbus_connection_connect.c
++++ b/src/sbus/connection/sbus_connection_connect.c
+@@ -67,6 +67,8 @@ sbus_connect_init_send(TALLOC_CTX *mem_ctx,
+ 
+     tevent_req_set_callback(subreq, sbus_connect_init_hello_done, req);
+ 
++    arm_watchdog();
++
+     return req;
+ }
+ 
+@@ -111,6 +113,8 @@ static void sbus_connect_init_done(struct tevent_req *subreq)
+     uint32_t res;
+     errno_t ret;
+ 
++    disarm_watchdog();
++
+     req = tevent_req_callback_data(subreq, struct tevent_req);
+ 
+     ret = sbus_call_DBus_RequestName_recv(subreq, &res);
+-- 
+2.38.1
+

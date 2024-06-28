@@ -1,0 +1,61 @@
+From 34c519a4851194164befc150df8e768431e66405 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pavel=20B=C5=99ezina?= <pbrezina@redhat.com>
+Date: Tue, 22 Sep 2020 11:04:25 +0200
+Subject: [PATCH 16/18] autofs: disable fast reply
+
+If the backend is offline when autofs starts and reads auto.master map
+we don't want to wait 60 seconds before the offline flag is reset. We
+need to allow autofs to retry the call much sooner.
+
+Resolves:
+https://github.com/SSSD/sssd/issues/3413
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ .../common/cache_req/plugins/cache_req_autofs_entry_by_name.c   | 2 +-
+ .../common/cache_req/plugins/cache_req_autofs_map_by_name.c     | 2 +-
+ .../common/cache_req/plugins/cache_req_autofs_map_entries.c     | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/responder/common/cache_req/plugins/cache_req_autofs_entry_by_name.c b/src/responder/common/cache_req/plugins/cache_req_autofs_entry_by_name.c
+index 55c9fc8b0..cd2085187 100644
+--- a/src/responder/common/cache_req/plugins/cache_req_autofs_entry_by_name.c
++++ b/src/responder/common/cache_req/plugins/cache_req_autofs_entry_by_name.c
+@@ -84,7 +84,7 @@ cache_req_autofs_entry_by_name_dp_send(TALLOC_CTX *mem_ctx,
+ 
+     return sbus_call_dp_autofs_GetEntry_send(mem_ctx, be_conn->conn,
+                                              be_conn->bus_name, SSS_BUS_PATH,
+-                                             DP_FAST_REPLY, data->name.name,
++                                             0, data->name.name,
+                                              data->autofs_entry_name);
+ }
+ 
+diff --git a/src/responder/common/cache_req/plugins/cache_req_autofs_map_by_name.c b/src/responder/common/cache_req/plugins/cache_req_autofs_map_by_name.c
+index 823eb3595..9d9bc3a97 100644
+--- a/src/responder/common/cache_req/plugins/cache_req_autofs_map_by_name.c
++++ b/src/responder/common/cache_req/plugins/cache_req_autofs_map_by_name.c
+@@ -81,7 +81,7 @@ cache_req_autofs_map_by_name_dp_send(TALLOC_CTX *mem_ctx,
+ 
+     return sbus_call_dp_autofs_GetMap_send(mem_ctx, be_conn->conn,
+                                            be_conn->bus_name, SSS_BUS_PATH,
+-                                           DP_FAST_REPLY, data->name.name);
++                                           0, data->name.name);
+ }
+ 
+ bool
+diff --git a/src/responder/common/cache_req/plugins/cache_req_autofs_map_entries.c b/src/responder/common/cache_req/plugins/cache_req_autofs_map_entries.c
+index 3e47b1321..ee0156b6a 100644
+--- a/src/responder/common/cache_req/plugins/cache_req_autofs_map_entries.c
++++ b/src/responder/common/cache_req/plugins/cache_req_autofs_map_entries.c
+@@ -113,7 +113,7 @@ cache_req_autofs_map_entries_dp_send(TALLOC_CTX *mem_ctx,
+ 
+     return sbus_call_dp_autofs_Enumerate_send(mem_ctx, be_conn->conn,
+                                               be_conn->bus_name, SSS_BUS_PATH,
+-                                              DP_FAST_REPLY, data->name.name);
++                                              0, data->name.name);
+ }
+ 
+ bool
+-- 
+2.21.3
+

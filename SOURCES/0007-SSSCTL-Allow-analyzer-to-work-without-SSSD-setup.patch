@@ -1,0 +1,33 @@
+From f8704cc24eafe190e6c78dc21535f6029d51d647 Mon Sep 17 00:00:00 2001
+From: Justin Stephenson <jstephen@redhat.com>
+Date: Mon, 15 Aug 2022 16:17:59 -0400
+Subject: [PATCH] SSSCTL: Allow analyzer to work without SSSD setup
+
+Fixes an issue when the sssctl analyzer option is
+used on systems where SSSD is not running or configured. This is
+an expected use case when using --logdir option to analyze external
+log files.
+
+Resolves: https://github.com/SSSD/sssd/issues/6298
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ src/tools/sssctl/sssctl.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/tools/sssctl/sssctl.c b/src/tools/sssctl/sssctl.c
+index 3816125ad..f18689f9f 100644
+--- a/src/tools/sssctl/sssctl.c
++++ b/src/tools/sssctl/sssctl.c
+@@ -296,7 +296,7 @@ int main(int argc, const char **argv)
+         SSS_TOOL_COMMAND("logs-remove", "Remove existing SSSD log files", 0, sssctl_logs_remove),
+         SSS_TOOL_COMMAND("logs-fetch", "Archive SSSD log files in tarball", 0, sssctl_logs_fetch),
+         SSS_TOOL_COMMAND("debug-level", "Change SSSD debug level", 0, sssctl_debug_level),
+-        SSS_TOOL_COMMAND("analyze", "Analyze logged data", 0, sssctl_analyze),
++        SSS_TOOL_COMMAND_FLAGS("analyze", "Analyze logged data", 0, sssctl_analyze, SSS_TOOL_FLAG_SKIP_CMD_INIT),
+ #ifdef HAVE_LIBINI_CONFIG_V1_3
+         SSS_TOOL_DELIMITER("Configuration files tools:"),
+         SSS_TOOL_COMMAND_FLAGS("config-check", "Perform static analysis of SSSD configuration", 0, sssctl_config_check, SSS_TOOL_FLAG_SKIP_CMD_INIT),
+-- 
+2.37.1
+

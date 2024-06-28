@@ -1,0 +1,71 @@
+From 18233532b72e62452eac6886652fa633ba055d8c Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Wed, 21 Oct 2020 19:20:03 +0200
+Subject: [PATCH 4/4] DEBUG: fixes program identifier as seen in syslog
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Commit 225fe9950f2807d5fb226f6b3be1ff4cefd731f0 changed `debug_prg_name`
+to accomodate needs of own SSSD logs, but this affected journal/syslog
+as well.
+
+This patch amends situation:
+ - journal messages gets "umbrella" identifier "sssd[]"
+ - syslog uses default which is program name
+
+Resolves: https://github.com/SSSD/sssd/issues/5384
+
+Reviewed-by: Tomáš Halman <thalman@redhat.com>
+---
+ src/util/debug.c   |  2 +-
+ src/util/sss_log.c | 12 +++---------
+ 2 files changed, 4 insertions(+), 10 deletions(-)
+
+diff --git a/src/util/debug.c b/src/util/debug.c
+index c162987b9..f05b26500 100644
+--- a/src/util/debug.c
++++ b/src/util/debug.c
+@@ -250,7 +250,7 @@ static errno_t journal_send(const char *file,
+             "MESSAGE=%s", message,
+             "PRIORITY=%i", LOG_DEBUG,
+             "SSSD_DOMAIN=%s", domain,
+-            "SSSD_PRG_NAME=%s", debug_prg_name,
++            "SSSD_PRG_NAME=sssd[%s]", debug_prg_name,
+             "SSSD_DEBUG_LEVEL=%x", level,
+             NULL);
+     ret = -res;
+diff --git a/src/util/sss_log.c b/src/util/sss_log.c
+index 48e73dbea..c6b7435c6 100644
+--- a/src/util/sss_log.c
++++ b/src/util/sss_log.c
+@@ -107,7 +107,7 @@ static void sss_log_internal(int priority, int facility, const char *format,
+                     "SSSD_DOMAIN=%s", domain,
+                     "PRIORITY=%i", syslog_priority,
+                     "SYSLOG_FACILITY=%i", LOG_FAC(facility),
+-                    "SYSLOG_IDENTIFIER=%s", debug_prg_name,
++                    "SYSLOG_IDENTIFIER=sssd[%s]", debug_prg_name,
+                     NULL);
+ 
+     free(message);
+@@ -118,15 +118,9 @@ static void sss_log_internal(int priority, int facility, const char *format,
+ static void sss_log_internal(int priority, int facility, const char *format,
+                             va_list ap)
+ {
+-    int syslog_priority;
+-
+-    syslog_priority = sss_to_syslog(priority);
+-
+-    openlog(debug_prg_name, 0, facility);
+-
+-    vsyslog(syslog_priority, format, ap);
++    int syslog_priority = sss_to_syslog(priority);
+ 
+-    closelog();
++    vsyslog(facility|syslog_priority, format, ap);
+ }
+ 
+ #endif /* WITH_JOURNALD */
+-- 
+2.21.3
+

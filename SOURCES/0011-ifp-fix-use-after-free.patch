@@ -1,0 +1,36 @@
+From 81e757b7b1d69893b5725f9c148c55d89c779e7b Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Tue, 3 Nov 2020 10:12:15 +0100
+Subject: [PATCH] ifp: fix use-after-free
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The variable fqdn is pointing to some data from state->res->msgs[0]. But
+before fqdn is used in the next search state->res and the memory
+hierarchy below is freed. As a result the location where fqdn is pointing
+to might hold the expected data or other data and the search will fail
+intermittently.
+
+Resolves: https://github.com/SSSD/sssd/issues/5382
+
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+---
+ src/responder/ifp/ifpsrv_cmd.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/responder/ifp/ifpsrv_cmd.c b/src/responder/ifp/ifpsrv_cmd.c
+index 9f20bf2db..d95618127 100644
+--- a/src/responder/ifp/ifpsrv_cmd.c
++++ b/src/responder/ifp/ifpsrv_cmd.c
+@@ -128,6 +128,7 @@ static void ifp_user_get_attr_done(struct tevent_req *subreq)
+         tevent_req_error(req, ERR_INTERNAL);
+         return;
+     }
++    fqdn = talloc_steal(state, fqdn);
+ 
+     if (state->search_type == SSS_DP_USER) {
+         /* throw away the result and perform attr search */
+-- 
+2.21.3
+

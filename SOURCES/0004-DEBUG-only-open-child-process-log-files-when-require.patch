@@ -1,0 +1,664 @@
+From 375887543daf26003ff7d900cf6a69d0c0b58523 Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Wed, 27 May 2020 22:33:50 +0200
+Subject: [PATCH] DEBUG: only open child process log files when required
+
+There was no reason to keep child process log files open permanently.
+
+This patch:
+ - helps to avoid issue when SIGHUP was ignored for child process logs;
+ - somewhat reduces code duplication.
+
+Resolves: https://github.com/SSSD/sssd/issues/4667
+
+Reviewed-by: Pawel Polawski <ppolawsk@redhat.com>
+---
+ src/providers/ad/ad_gpo.c                | 17 +++--------------
+ src/providers/ad/ad_init.c               |  7 -------
+ src/providers/ad/ad_machine_pw_renewal.c |  2 +-
+ src/providers/ipa/ipa_init.c             |  7 -------
+ src/providers/ipa/ipa_selinux.c          | 17 +----------------
+ src/providers/krb5/krb5_child_handler.c  |  2 +-
+ src/providers/krb5/krb5_common.h         |  1 -
+ src/providers/krb5/krb5_init_shared.c    |  8 --------
+ src/providers/ldap/ldap_common.c         |  3 ---
+ src/providers/ldap/ldap_common.h         |  6 ------
+ src/providers/ldap/ldap_init.c           |  7 -------
+ src/providers/ldap/sdap_child_helpers.c  | 10 +---------
+ src/responder/pam/pamsrv.c               |  1 -
+ src/responder/pam/pamsrv.h               |  2 --
+ src/responder/pam/pamsrv_cmd.c           |  2 +-
+ src/responder/pam/pamsrv_p11.c           |  9 ++-------
+ src/responder/ssh/ssh_private.h          |  1 -
+ src/responder/ssh/ssh_reply.c            |  4 ++--
+ src/responder/ssh/sshsrv.c               | 10 ----------
+ src/tests/cmocka/test_cert_utils.c       | 12 ++++++------
+ src/util/cert.h                          |  2 +-
+ src/util/cert/cert_common_p11_child.c    |  9 ++++-----
+ src/util/child_common.c                  | 21 +++++++++++++++++----
+ src/util/child_common.h                  |  6 ++----
+ 24 files changed, 42 insertions(+), 124 deletions(-)
+
+diff --git a/src/providers/ad/ad_gpo.c b/src/providers/ad/ad_gpo.c
+index f17917552..bbe8d8a1e 100644
+--- a/src/providers/ad/ad_gpo.c
++++ b/src/providers/ad/ad_gpo.c
+@@ -99,15 +99,14 @@
+ #define GPO_CHILD SSSD_LIBEXEC_PATH"/gpo_child"
+ #endif
+ 
++#define GPO_CHILD_LOG_FILE "gpo_child"
++
+ /* If INI_PARSE_IGNORE_NON_KVP is not defined, use 0 (no effect) */
+ #ifndef INI_PARSE_IGNORE_NON_KVP
+ #define INI_PARSE_IGNORE_NON_KVP 0
+ #warning INI_PARSE_IGNORE_NON_KVP not defined.
+ #endif
+ 
+-/* fd used by the gpo_child process for logging */
+-int gpo_child_debug_fd = -1;
+-
+ /* == common data structures and declarations ============================= */
+ 
+ struct gp_som {
+@@ -1618,13 +1617,6 @@ ad_gpo_access_check(TALLOC_CTX *mem_ctx,
+     return ret;
+ }
+ 
+-#define GPO_CHILD_LOG_FILE "gpo_child"
+-
+-static errno_t gpo_child_init(void)
+-{
+-    return child_debug_init(GPO_CHILD_LOG_FILE, &gpo_child_debug_fd);
+-}
+-
+ /*
+  * This function retrieves the raw policy_setting_value for the input key from
+  * the GPO_Result object in the sysdb cache. It then parses the raw value and
+@@ -1808,9 +1800,6 @@ ad_gpo_access_send(TALLOC_CTX *mem_ctx,
+     hash_value_t val;
+     enum gpo_map_type gpo_map_type;
+ 
+-    /* setup logging for gpo child */
+-    gpo_child_init();
+-
+     req = tevent_req_create(mem_ctx, &state, struct ad_gpo_access_state);
+     if (req == NULL) {
+         DEBUG(SSSDBG_CRIT_FAILURE, "tevent_req_create() failed\n");
+@@ -4763,7 +4752,7 @@ gpo_fork_child(struct tevent_req *req)
+     if (pid == 0) { /* child */
+         exec_child_ex(state,
+                       pipefd_to_child, pipefd_from_child,
+-                      GPO_CHILD, gpo_child_debug_fd, NULL, false,
++                      GPO_CHILD, GPO_CHILD_LOG_FILE, NULL, false,
+                       STDIN_FILENO, AD_GPO_CHILD_OUT_FILENO);
+ 
+         /* We should never get here */
+diff --git a/src/providers/ad/ad_init.c b/src/providers/ad/ad_init.c
+index 05535fcb0..704e63a06 100644
+--- a/src/providers/ad/ad_init.c
++++ b/src/providers/ad/ad_init.c
+@@ -402,13 +402,6 @@ static errno_t ad_init_misc(struct be_ctx *be_ctx,
+ 
+     sdap_id_ctx->opts->sdom->pvt = ad_id_ctx;
+ 
+-    ret = sdap_setup_child();
+-    if (ret != EOK) {
+-        DEBUG(SSSDBG_CRIT_FAILURE, "sdap_setup_child() failed [%d]: %s\n",
+-              ret, sss_strerror(ret));
+-        return ret;
+-    }
+-
+     ret = ad_init_srv_plugin(be_ctx, ad_options);
+     if (ret != EOK) {
+         DEBUG(SSSDBG_CRIT_FAILURE, "Unable to setup SRV plugin [%d]: %s\n",
+diff --git a/src/providers/ad/ad_machine_pw_renewal.c b/src/providers/ad/ad_machine_pw_renewal.c
+index e0db5fad5..ce9bbe6f3 100644
+--- a/src/providers/ad/ad_machine_pw_renewal.c
++++ b/src/providers/ad/ad_machine_pw_renewal.c
+@@ -185,7 +185,7 @@ ad_machine_account_password_renewal_send(TALLOC_CTX *mem_ctx,
+     child_pid = fork();
+     if (child_pid == 0) { /* child */
+         exec_child_ex(state, pipefd_to_child, pipefd_from_child,
+-                      renewal_data->prog_path, -1,
++                      renewal_data->prog_path, NULL,
+                       extra_args, true,
+                       STDIN_FILENO, STDERR_FILENO);
+ 
+diff --git a/src/providers/ipa/ipa_init.c b/src/providers/ipa/ipa_init.c
+index cdfd11d7a..d8d592653 100644
+--- a/src/providers/ipa/ipa_init.c
++++ b/src/providers/ipa/ipa_init.c
+@@ -571,13 +571,6 @@ static errno_t ipa_init_misc(struct be_ctx *be_ctx,
+         return ret;
+     }
+ 
+-    ret = sdap_setup_child();
+-    if (ret != EOK) {
+-        DEBUG(SSSDBG_CRIT_FAILURE, "Unable to setup sdap child [%d]: %s\n",
+-              ret, sss_strerror(ret));
+-        return ret;
+-    }
+-
+     if (dp_opt_get_bool(ipa_options->basic, IPA_SERVER_MODE)) {
+         ret = ipa_init_server_mode(be_ctx, ipa_options, ipa_id_ctx);
+         if (ret != EOK) {
+diff --git a/src/providers/ipa/ipa_selinux.c b/src/providers/ipa/ipa_selinux.c
+index 630f68ad5..9ae37b90d 100644
+--- a/src/providers/ipa/ipa_selinux.c
++++ b/src/providers/ipa/ipa_selinux.c
+@@ -51,9 +51,6 @@
+ 
+ #include <selinux/selinux.h>
+ 
+-/* fd used by the selinux_child process for logging */
+-int selinux_child_debug_fd = -1;
+-
+ static struct tevent_req *
+ ipa_get_selinux_send(TALLOC_CTX *mem_ctx,
+                      struct be_ctx *be_ctx,
+@@ -565,7 +562,6 @@ struct selinux_child_state {
+     struct child_io_fds *io;
+ };
+ 
+-static errno_t selinux_child_init(void);
+ static errno_t selinux_child_create_buffer(struct selinux_child_state *state);
+ static errno_t selinux_fork_child(struct selinux_child_state *state);
+ static void selinux_child_step(struct tevent_req *subreq);
+@@ -602,12 +598,6 @@ static struct tevent_req *selinux_child_send(TALLOC_CTX *mem_ctx,
+     state->io->read_from_child_fd = -1;
+     talloc_set_destructor((void *) state->io, child_io_destructor);
+ 
+-    ret = selinux_child_init();
+-    if (ret != EOK) {
+-        DEBUG(SSSDBG_OP_FAILURE, "Failed to init the child\n");
+-        goto immediately;
+-    }
+-
+     ret = selinux_child_create_buffer(state);
+     if (ret != EOK) {
+         DEBUG(SSSDBG_OP_FAILURE, "Failed to create the send buffer\n");
+@@ -638,11 +628,6 @@ immediately:
+     return req;
+ }
+ 
+-static errno_t selinux_child_init(void)
+-{
+-    return child_debug_init(SELINUX_CHILD_LOG_FILE, &selinux_child_debug_fd);
+-}
+-
+ static errno_t selinux_child_create_buffer(struct selinux_child_state *state)
+ {
+     size_t rp;
+@@ -712,7 +697,7 @@ static errno_t selinux_fork_child(struct selinux_child_state *state)
+ 
+     if (pid == 0) { /* child */
+         exec_child(state, pipefd_to_child, pipefd_from_child,
+-                   SELINUX_CHILD, selinux_child_debug_fd);
++                   SELINUX_CHILD, SELINUX_CHILD_LOG_FILE);
+         DEBUG(SSSDBG_CRIT_FAILURE, "Could not exec selinux_child: [%d][%s].\n",
+               ret, sss_strerror(ret));
+         return ret;
+diff --git a/src/providers/krb5/krb5_child_handler.c b/src/providers/krb5/krb5_child_handler.c
+index b7fb54499..8546285b2 100644
+--- a/src/providers/krb5/krb5_child_handler.c
++++ b/src/providers/krb5/krb5_child_handler.c
+@@ -465,7 +465,7 @@ static errno_t fork_child(struct tevent_req *req)
+     if (pid == 0) { /* child */
+         exec_child_ex(state,
+                       pipefd_to_child, pipefd_from_child,
+-                      KRB5_CHILD, state->kr->krb5_ctx->child_debug_fd,
++                      KRB5_CHILD, KRB5_CHILD_LOG_FILE,
+                       krb5_child_extra_args, false,
+                       STDIN_FILENO, STDOUT_FILENO);
+ 
+diff --git a/src/providers/krb5/krb5_common.h b/src/providers/krb5/krb5_common.h
+index 493d12e5f..f198e2684 100644
+--- a/src/providers/krb5/krb5_common.h
++++ b/src/providers/krb5/krb5_common.h
+@@ -124,7 +124,6 @@ struct krb5_ctx {
+     struct dp_option *opts;
+     struct krb5_service *service;
+     struct krb5_service *kpasswd_service;
+-    int child_debug_fd;
+ 
+     sss_regexp_t *illegal_path_re;
+ 
+diff --git a/src/providers/krb5/krb5_init_shared.c b/src/providers/krb5/krb5_init_shared.c
+index afe15b365..ea3d32805 100644
+--- a/src/providers/krb5/krb5_init_shared.c
++++ b/src/providers/krb5/krb5_init_shared.c
+@@ -71,14 +71,6 @@ errno_t krb5_child_init(struct krb5_ctx *krb5_auth_ctx,
+         goto done;
+     }
+ 
+-    krb5_auth_ctx->child_debug_fd = -1; /* -1 means not initialized */
+-    ret = child_debug_init(KRB5_CHILD_LOG_FILE,
+-                           &krb5_auth_ctx->child_debug_fd);
+-    if (ret != EOK) {
+-        DEBUG(SSSDBG_OP_FAILURE, "Could not set krb5_child debugging!\n");
+-        goto done;
+-    }
+-
+     ret = parse_krb5_map_user(krb5_auth_ctx,
+                               dp_opt_get_cstring(krb5_auth_ctx->opts,
+                                                  KRB5_MAP_USER),
+diff --git a/src/providers/ldap/ldap_common.c b/src/providers/ldap/ldap_common.c
+index 9d7806a2f..2133db36f 100644
+--- a/src/providers/ldap/ldap_common.c
++++ b/src/providers/ldap/ldap_common.c
+@@ -35,9 +35,6 @@
+ 
+ #include "providers/ldap/sdap_idmap.h"
+ 
+-/* a fd the child process would log into */
+-int ldap_child_debug_fd = -1;
+-
+ errno_t ldap_id_setup_tasks(struct sdap_id_ctx *ctx)
+ {
+     return sdap_id_setup_tasks(ctx->be, ctx, ctx->opts->sdom,
+diff --git a/src/providers/ldap/ldap_common.h b/src/providers/ldap/ldap_common.h
+index 63ee5dd84..13e6d4871 100644
+--- a/src/providers/ldap/ldap_common.h
++++ b/src/providers/ldap/ldap_common.h
+@@ -44,9 +44,6 @@
+ 
+ #define LDAP_ENUM_PURGE_TIMEOUT 10800
+ 
+-/* a fd the child process would log into */
+-extern int ldap_child_debug_fd;
+-
+ struct sdap_id_ctx;
+ 
+ struct sdap_id_conn_ctx {
+@@ -342,9 +339,6 @@ sdap_ipnetwork_handler_recv(TALLOC_CTX *mem_ctx,
+                             struct tevent_req *req,
+                             struct dp_reply_std *data);
+ 
+-/* setup child logging */
+-int sdap_setup_child(void);
+-
+ 
+ errno_t string_to_shadowpw_days(const char *s, long *d);
+ 
+diff --git a/src/providers/ldap/ldap_init.c b/src/providers/ldap/ldap_init.c
+index 1be5d13de..de64e5985 100644
+--- a/src/providers/ldap/ldap_init.c
++++ b/src/providers/ldap/ldap_init.c
+@@ -419,13 +419,6 @@ static errno_t ldap_init_misc(struct be_ctx *be_ctx,
+         return ret;
+     }
+ 
+-    ret = sdap_setup_child();
+-    if (ret != EOK) {
+-        DEBUG(SSSDBG_CRIT_FAILURE, "Unable to setup sdap child [%d]: %s\n",
+-              ret, sss_strerror(ret));
+-        return ret;
+-    }
+-
+     /* Setup SRV lookup plugin */
+     ret = be_fo_set_dns_srv_lookup_plugin(be_ctx, NULL);
+     if (ret != EOK) {
+diff --git a/src/providers/ldap/sdap_child_helpers.c b/src/providers/ldap/sdap_child_helpers.c
+index a03d28c9c..9d25aea8b 100644
+--- a/src/providers/ldap/sdap_child_helpers.c
++++ b/src/providers/ldap/sdap_child_helpers.c
+@@ -111,7 +111,7 @@ static errno_t sdap_fork_child(struct tevent_context *ev,
+     if (pid == 0) { /* child */
+         exec_child(child,
+                    pipefd_to_child, pipefd_from_child,
+-                   LDAP_CHILD, ldap_child_debug_fd);
++                   LDAP_CHILD, LDAP_CHILD_LOG_FILE);
+ 
+         /* We should never get here */
+         DEBUG(SSSDBG_CRIT_FAILURE, "BUG: Could not exec LDAP child\n");
+@@ -512,11 +512,3 @@ static errno_t set_tgt_child_timeout(struct tevent_req *req,
+ 
+     return EOK;
+ }
+-
+-
+-
+-/* Setup child logging */
+-int sdap_setup_child(void)
+-{
+-    return child_debug_init(LDAP_CHILD_LOG_FILE, &ldap_child_debug_fd);
+-}
+diff --git a/src/responder/pam/pamsrv.c b/src/responder/pam/pamsrv.c
+index a4c9ebbbb..dde44a472 100644
+--- a/src/responder/pam/pamsrv.c
++++ b/src/responder/pam/pamsrv.c
+@@ -277,7 +277,6 @@ static int pam_process_init(TALLOC_CTX *mem_ctx,
+         goto done;
+     }
+ 
+-    pctx->p11_child_debug_fd = -1;
+     if (pctx->cert_auth) {
+         ret = p11_child_init(pctx);
+         if (ret != EOK) {
+diff --git a/src/responder/pam/pamsrv.h b/src/responder/pam/pamsrv.h
+index 24bd9764d..478d91b93 100644
+--- a/src/responder/pam/pamsrv.h
++++ b/src/responder/pam/pamsrv.h
+@@ -54,7 +54,6 @@ struct pam_ctx {
+     char **app_services;
+ 
+     bool cert_auth;
+-    int p11_child_debug_fd;
+     char *nss_db;
+     struct sss_certmap_ctx *sss_certmap_ctx;
+     char **smartcard_services;
+@@ -110,7 +109,6 @@ void sss_cai_check_users(struct cert_auth_info **list, size_t *_cert_count,
+ 
+ struct tevent_req *pam_check_cert_send(TALLOC_CTX *mem_ctx,
+                                        struct tevent_context *ev,
+-                                       int child_debug_fd,
+                                        const char *nss_db,
+                                        time_t timeout,
+                                        const char *verify_opts,
+diff --git a/src/responder/pam/pamsrv_cmd.c b/src/responder/pam/pamsrv_cmd.c
+index ddde9eda2..1cd901f15 100644
+--- a/src/responder/pam/pamsrv_cmd.c
++++ b/src/responder/pam/pamsrv_cmd.c
+@@ -1404,7 +1404,7 @@ static errno_t check_cert(TALLOC_CTX *mctx,
+         return ret;
+     }
+ 
+-    req = pam_check_cert_send(mctx, ev, pctx->p11_child_debug_fd,
++    req = pam_check_cert_send(mctx, ev,
+                               pctx->nss_db, p11_child_timeout,
+                               cert_verification_opts, pctx->sss_certmap_ctx,
+                               uri, pd);
+diff --git a/src/responder/pam/pamsrv_p11.c b/src/responder/pam/pamsrv_p11.c
+index 8e276b200..3f0afaeff 100644
+--- a/src/responder/pam/pamsrv_p11.c
++++ b/src/responder/pam/pamsrv_p11.c
+@@ -242,7 +242,7 @@ errno_t p11_child_init(struct pam_ctx *pctx)
+         return ret;
+     }
+ 
+-    return child_debug_init(P11_CHILD_LOG_FILE, &pctx->p11_child_debug_fd);
++    return EOK;
+ }
+ 
+ static inline bool
+@@ -705,7 +705,6 @@ static void p11_child_timeout(struct tevent_context *ev,
+ 
+ struct tevent_req *pam_check_cert_send(TALLOC_CTX *mem_ctx,
+                                        struct tevent_context *ev,
+-                                       int child_debug_fd,
+                                        const char *nss_db,
+                                        time_t timeout,
+                                        const char *verify_opts,
+@@ -838,14 +837,10 @@ struct tevent_req *pam_check_cert_send(TALLOC_CTX *mem_ctx,
+         goto done;
+     }
+ 
+-    if (child_debug_fd == -1) {
+-        child_debug_fd = STDERR_FILENO;
+-    }
+-
+     child_pid = fork();
+     if (child_pid == 0) { /* child */
+         exec_child_ex(state, pipefd_to_child, pipefd_from_child,
+-                      P11_CHILD_PATH, child_debug_fd, extra_args, false,
++                      P11_CHILD_PATH, P11_CHILD_LOG_FILE, extra_args, false,
+                       STDIN_FILENO, STDOUT_FILENO);
+ 
+         /* We should never get here */
+diff --git a/src/responder/ssh/ssh_private.h b/src/responder/ssh/ssh_private.h
+index 028ccd616..5aa7e37d6 100644
+--- a/src/responder/ssh/ssh_private.h
++++ b/src/responder/ssh/ssh_private.h
+@@ -36,7 +36,6 @@ struct ssh_ctx {
+     char *ca_db;
+     bool use_cert_keys;
+ 
+-    int p11_child_debug_fd;
+     time_t certmap_last_read;
+     struct sss_certmap_ctx *sss_certmap_ctx;
+     char **cert_rules;
+diff --git a/src/responder/ssh/ssh_reply.c b/src/responder/ssh/ssh_reply.c
+index 97914266d..edeb28765 100644
+--- a/src/responder/ssh/ssh_reply.c
++++ b/src/responder/ssh/ssh_reply.c
+@@ -249,7 +249,7 @@ struct tevent_req *ssh_get_output_keys_send(TALLOC_CTX *mem_ctx,
+                                                    : state->user_cert_override;
+ 
+     subreq = cert_to_ssh_key_send(state, state->ev,
+-                                  state->ssh_ctx->p11_child_debug_fd,
++                                  P11_CHILD_LOG_FILE,
+                                   state->p11_child_timeout,
+                                   state->ssh_ctx->ca_db,
+                                   state->ssh_ctx->sss_certmap_ctx,
+@@ -335,7 +335,7 @@ void ssh_get_output_keys_done(struct tevent_req *subreq)
+         goto done;
+     }
+ 
+-    subreq = cert_to_ssh_key_send(state, state->ev, -1,
++    subreq = cert_to_ssh_key_send(state, state->ev, NULL,
+                                   state->p11_child_timeout,
+                                   state->ssh_ctx->ca_db,
+                                   state->ssh_ctx->sss_certmap_ctx,
+diff --git a/src/responder/ssh/sshsrv.c b/src/responder/ssh/sshsrv.c
+index 7765e91b8..6072a702c 100644
+--- a/src/responder/ssh/sshsrv.c
++++ b/src/responder/ssh/sshsrv.c
+@@ -126,16 +126,6 @@ int ssh_process_init(TALLOC_CTX *mem_ctx,
+         goto fail;
+     }
+ 
+-    ssh_ctx->p11_child_debug_fd = -1;
+-    if (ssh_ctx->use_cert_keys) {
+-        ret = child_debug_init(P11_CHILD_LOG_FILE,
+-                               &ssh_ctx->p11_child_debug_fd);
+-        if (ret != EOK) {
+-            DEBUG(SSSDBG_FATAL_FAILURE,
+-                  "Failed to setup p11_child logging, ignored.\n");
+-        }
+-    }
+-
+     ret = schedule_get_domains_task(rctx, rctx->ev, rctx, NULL);
+     if (ret != EOK) {
+         DEBUG(SSSDBG_FATAL_FAILURE, "schedule_get_domains_tasks failed.\n");
+diff --git a/src/tests/cmocka/test_cert_utils.c b/src/tests/cmocka/test_cert_utils.c
+index 848ed1a8d..1ff20576a 100644
+--- a/src/tests/cmocka/test_cert_utils.c
++++ b/src/tests/cmocka/test_cert_utils.c
+@@ -391,7 +391,7 @@ void test_cert_to_ssh_key_send(void **state)
+     ev = tevent_context_init(ts);
+     assert_non_null(ev);
+ 
+-    req = cert_to_ssh_key_send(ts, ev, -1, P11_CHILD_TIMEOUT,
++    req = cert_to_ssh_key_send(ts, ev, NULL, P11_CHILD_TIMEOUT,
+ #ifdef HAVE_NSS
+                             "sql:" ABS_BUILD_DIR "/src/tests/test_CA/p11_nssdb",
+ #else
+@@ -465,7 +465,7 @@ void test_cert_to_ssh_2keys_send(void **state)
+     ev = tevent_context_init(ts);
+     assert_non_null(ev);
+ 
+-    req = cert_to_ssh_key_send(ts, ev, -1, P11_CHILD_TIMEOUT,
++    req = cert_to_ssh_key_send(ts, ev, NULL, P11_CHILD_TIMEOUT,
+ #ifdef HAVE_NSS
+                             "sql:" ABS_BUILD_DIR "/src/tests/test_CA/p11_nssdb",
+ #else
+@@ -548,7 +548,7 @@ void test_cert_to_ssh_2keys_invalid_send(void **state)
+     ev = tevent_context_init(ts);
+     assert_non_null(ev);
+ 
+-    req = cert_to_ssh_key_send(ts, ev, -1, P11_CHILD_TIMEOUT,
++    req = cert_to_ssh_key_send(ts, ev, NULL, P11_CHILD_TIMEOUT,
+ #ifdef HAVE_NSS
+                             "sql:" ABS_BUILD_DIR "/src/tests/test_CA/p11_nssdb",
+ #else
+@@ -614,7 +614,7 @@ void test_ec_cert_to_ssh_key_send(void **state)
+     ev = tevent_context_init(ts);
+     assert_non_null(ev);
+ 
+-    req = cert_to_ssh_key_send(ts, ev, -1, P11_CHILD_TIMEOUT,
++    req = cert_to_ssh_key_send(ts, ev, NULL, P11_CHILD_TIMEOUT,
+ #ifdef HAVE_NSS
+                     "sql:" ABS_BUILD_DIR "/src/tests/test_ECC_CA/p11_ecc_nssdb",
+ #else
+@@ -691,7 +691,7 @@ void test_cert_to_ssh_2keys_with_certmap_send(void **state)
+     ev = tevent_context_init(ts);
+     assert_non_null(ev);
+ 
+-    req = cert_to_ssh_key_send(ts, ev, -1, P11_CHILD_TIMEOUT,
++    req = cert_to_ssh_key_send(ts, ev, NULL, P11_CHILD_TIMEOUT,
+ #ifdef HAVE_NSS
+                             "sql:" ABS_BUILD_DIR "/src/tests/test_CA/p11_nssdb",
+ #else
+@@ -769,7 +769,7 @@ void test_cert_to_ssh_2keys_with_certmap_2_send(void **state)
+     ev = tevent_context_init(ts);
+     assert_non_null(ev);
+ 
+-    req = cert_to_ssh_key_send(ts, ev, -1, P11_CHILD_TIMEOUT,
++    req = cert_to_ssh_key_send(ts, ev, NULL, P11_CHILD_TIMEOUT,
+ #ifdef HAVE_NSS
+                             "sql:" ABS_BUILD_DIR "/src/tests/test_CA/p11_nssdb",
+ #else
+diff --git a/src/util/cert.h b/src/util/cert.h
+index d038a99f6..16dda37b3 100644
+--- a/src/util/cert.h
++++ b/src/util/cert.h
+@@ -57,7 +57,7 @@ errno_t get_ssh_key_from_derb64(TALLOC_CTX *mem_ctx, const char *derb64,
+ 
+ struct tevent_req *cert_to_ssh_key_send(TALLOC_CTX *mem_ctx,
+                                         struct tevent_context *ev,
+-                                        int child_debug_fd, time_t timeout,
++                                        const char *logfile, time_t timeout,
+                                         const char *ca_db,
+                                         struct sss_certmap_ctx *sss_certmap_ctx,
+                                         size_t cert_count,
+diff --git a/src/util/cert/cert_common_p11_child.c b/src/util/cert/cert_common_p11_child.c
+index 1846ff89a..18a331f23 100644
+--- a/src/util/cert/cert_common_p11_child.c
++++ b/src/util/cert/cert_common_p11_child.c
+@@ -24,7 +24,7 @@
+ 
+ struct cert_to_ssh_key_state {
+     struct tevent_context *ev;
+-    int child_debug_fd;
++    const char *logfile;
+     time_t timeout;
+     const char **extra_args;
+     const char **certs;
+@@ -45,7 +45,7 @@ static void cert_to_ssh_key_done(int child_status,
+ 
+ struct tevent_req *cert_to_ssh_key_send(TALLOC_CTX *mem_ctx,
+                                         struct tevent_context *ev,
+-                                        int child_debug_fd, time_t timeout,
++                                        const char *logfile, time_t timeout,
+                                         const char *ca_db,
+                                         struct sss_certmap_ctx *sss_certmap_ctx,
+                                         size_t cert_count,
+@@ -70,8 +70,7 @@ struct tevent_req *cert_to_ssh_key_send(TALLOC_CTX *mem_ctx,
+     }
+ 
+     state->ev = ev;
+-    state->child_debug_fd = (child_debug_fd == -1) ? STDERR_FILENO
+-                                                   : child_debug_fd;
++    state->logfile = logfile;
+     state->timeout = timeout;
+     state->io = talloc(state, struct child_io_fds);
+     if (state->io == NULL) {
+@@ -205,7 +204,7 @@ static errno_t cert_to_ssh_key_step(struct tevent_req *req)
+     child_pid = fork();
+     if (child_pid == 0) { /* child */
+         exec_child_ex(state, pipefd_to_child, pipefd_from_child, P11_CHILD_PATH,
+-                      state->child_debug_fd, state->extra_args, false,
++                      state->logfile, state->extra_args, false,
+                       STDIN_FILENO, STDOUT_FILENO);
+         /* We should never get here */
+         DEBUG(SSSDBG_CRIT_FAILURE, "BUG: Could not exec p11 child\n");
+diff --git a/src/util/child_common.c b/src/util/child_common.c
+index 3a07580c2..5cac725ca 100644
+--- a/src/util/child_common.c
++++ b/src/util/child_common.c
+@@ -47,6 +47,8 @@ struct sss_child_ctx {
+     struct sss_sigchild_ctx *sigchld_ctx;
+ };
+ 
++static errno_t child_debug_init(const char *logfile, int *debug_fd);
++
+ static void sss_child_handler(struct tevent_context *ev,
+                               struct tevent_signal *se,
+                               int signum,
+@@ -725,13 +727,24 @@ fail:
+ 
+ void exec_child_ex(TALLOC_CTX *mem_ctx,
+                    int *pipefd_to_child, int *pipefd_from_child,
+-                   const char *binary, int debug_fd,
++                   const char *binary, const char *logfile,
+                    const char *extra_argv[], bool extra_args_only,
+                    int child_in_fd, int child_out_fd)
+ {
+     int ret;
+     errno_t err;
+     char **argv;
++    int debug_fd = -1;
++
++    if (logfile) {
++        ret = child_debug_init(logfile, &debug_fd);
++        if (ret != EOK) {
++            DEBUG(SSSDBG_CRIT_FAILURE, "child_debug_init() failed.\n");
++            exit(EXIT_FAILURE);
++        }
++    } else {
++        debug_fd = STDERR_FILENO;
++    }
+ 
+     close(pipefd_to_child[1]);
+     ret = dup2(pipefd_to_child[0], child_in_fd);
+@@ -767,10 +780,10 @@ void exec_child_ex(TALLOC_CTX *mem_ctx,
+ 
+ void exec_child(TALLOC_CTX *mem_ctx,
+                 int *pipefd_to_child, int *pipefd_from_child,
+-                const char *binary, int debug_fd)
++                const char *binary, const char *logfile)
+ {
+     exec_child_ex(mem_ctx, pipefd_to_child, pipefd_from_child,
+-                  binary, debug_fd, NULL, false,
++                  binary, logfile, NULL, false,
+                   STDIN_FILENO, STDOUT_FILENO);
+ }
+ 
+@@ -803,7 +816,7 @@ int child_io_destructor(void *ptr)
+     return EOK;
+ }
+ 
+-errno_t child_debug_init(const char *logfile, int *debug_fd)
++static errno_t child_debug_init(const char *logfile, int *debug_fd)
+ {
+     int ret;
+     FILE *debug_filep;
+diff --git a/src/util/child_common.h b/src/util/child_common.h
+index 37116e2a7..92d66a500 100644
+--- a/src/util/child_common.h
++++ b/src/util/child_common.h
+@@ -106,7 +106,7 @@ void fd_nonblocking(int fd);
+ /* Never returns EOK, ether returns an error, or doesn't return on success */
+ void exec_child_ex(TALLOC_CTX *mem_ctx,
+                    int *pipefd_to_child, int *pipefd_from_child,
+-                   const char *binary, int debug_fd,
++                   const char *binary, const char *logfile,
+                    const char *extra_argv[], bool extra_args_only,
+                    int child_in_fd, int child_out_fd);
+ 
+@@ -115,10 +115,8 @@ void exec_child_ex(TALLOC_CTX *mem_ctx,
+  */
+ void exec_child(TALLOC_CTX *mem_ctx,
+                 int *pipefd_to_child, int *pipefd_from_child,
+-                const char *binary, int debug_fd);
++                const char *binary, const char *logfile);
+ 
+ int child_io_destructor(void *ptr);
+ 
+-errno_t child_debug_init(const char *logfile, int *debug_fd);
+-
+ #endif /* __CHILD_COMMON_H__ */
+-- 
+2.21.3
+
